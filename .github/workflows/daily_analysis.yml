@@ -46,6 +46,16 @@ jobs:
         with:
           python-version: '3.11'
           cache: 'pip'
+
+      - name: 缓存pip依赖
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pip
+            ./venv
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
       
       - name: 安装依赖
         run: |

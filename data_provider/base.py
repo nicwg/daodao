@@ -40,6 +40,33 @@ logger = logging.getLogger(__name__)
 STANDARD_COLUMNS = ['date', 'open', 'high', 'low', 'close', 'volume', 'amount', 'pct_chg']
 
 
+def unwrap_exception(exc: Exception) -> Exception:
+    """
+    Follow chained exceptions and return the deepest non-cyclic cause.
+    """
+    current = exc
+    visited = set()
+
+    while current is not None and id(current) not in visited:
+        visited.add(id(current))
+        next_exc = current.__cause__ or current.__context__
+        if next_exc is None:
+            break
+        current = next_exc
+
+    return current
+
+
+def summarize_exception(exc: Exception) -> Tuple[str, str]:
+    """
+    Build a stable summary for logs while preserving the application-layer message.
+    """
+    root = unwrap_exception(exc)
+    error_type = type(root).__name__
+    message = str(exc).strip() or str(root).strip() or error_type
+    return error_type, " ".join(message.split())
+
+
 def normalize_stock_code(stock_code: str) -> str:
     """
     Normalize stock code by stripping exchange prefixes/suffixes.
@@ -253,8 +280,9 @@ class BaseFetcher(ABC):
             from datetime import timedelta
             start_dt = datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=days * 2)
             start_date = start_dt.strftime('%Y-%m-%d')
-        
-        logger.info(f"[{self.name}] 获取 {stock_code} 数据: {start_date} ~ {end_date}")
+
+        request_start = time.time()
+        logger.info(f"[{self.name}] 开始获取 {stock_code} 日线数据: 范围={start_date} ~ {end_date}")
         
         try:
             # Step 1: 获取原始数据
@@ -271,13 +299,22 @@ class BaseFetcher(ABC):
             
             # Step 4: 计算技术指标
             df = self._calculate_indicators(df)
-            
-            logger.info(f"[{self.name}] {stock_code} 获取成功，共 {len(df)} 条数据")
+
+            elapsed = time.time() - request_start
+            logger.info(
+                f"[{self.name}] {stock_code} 获取成功: 范围={start_date} ~ {end_date}, "
+                f"rows={len(df)}, elapsed={elapsed:.2f}s"
+            )
             return df
             
         except Exception as e:
-            logger.error(f"[{self.name}] 获取 {stock_code} 失败: {str(e)}")
-            raise DataFetchError(f"[{self.name}] {stock_code}: {str(e)}") from e
+            elapsed = time.time() - request_start
+            error_type, error_reason = summarize_exception(e)
+            logger.error(
+                f"[{self.name}] {stock_code} 获取失败: 范围={start_date} ~ {end_date}, "
+                f"error_type={error_type}, elapsed={elapsed:.2f}s, reason={error_reason}"
+            )
+            raise DataFetchError(f"[{self.name}] {stock_code}: {error_reason}") from e
     
     def _clean_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -472,13 +509,18 @@ class DataFetcherManager:
         stock_code = normalize_stock_code(stock_code)
 
         errors = []
+        total_fetchers = len(self._fetchers)
+        request_start = time.time()
 
         # 快速路径：美股指数与美股股票直接路由到 YfinanceFetcher
         if is_us_index_code(stock_code) or is_us_stock_code(stock_code):
-            for fetcher in self._fetchers:
+            for attempt, fetcher in enumerate(self._fetchers, start=1):
                 if fetcher.name == "YfinanceFetcher":
                     try:
-                        logger.info(f"[{fetcher.name}] 美股/美股指数 {stock_code} 直接路由...")
+                        logger.info(
+                            f"[数据源尝试 {attempt}/{total_fetchers}] [{fetcher.name}] "
+                            f"美股/美股指数 {stock_code} 直接路由..."
+                        )
                         df = fetcher.get_daily_data(
                             stock_code=stock_code,
                             start_date=start_date,
@@ -486,21 +528,30 @@ class DataFetcherManager:
                             days=days,
                         )
                         if df is not None and not df.empty:
-                            logger.info(f"[{fetcher.name}] 成功获取 {stock_code}")
+                            elapsed = time.time() - request_start
+                            logger.info(
+                                f"[数据源完成] {stock_code} 使用 [{fetcher.name}] 获取成功: "
+                                f"rows={len(df)}, elapsed={elapsed:.2f}s"
+                            )
                             return df, fetcher.name
                     except Exception as e:
-                        error_msg = f"[{fetcher.name}] 失败: {str(e)}"
-                        logger.warning(error_msg)
+                        error_type, error_reason = summarize_exception(e)
+                        error_msg = f"[{fetcher.name}] ({error_type}) {error_reason}"
+                        logger.warning(
+                            f"[数据源失败 {attempt}/{total_fetchers}] [{fetcher.name}] {stock_code}: "
+                            f"error_type={error_type}, reason={error_reason}"
+                        )
                         errors.append(error_msg)
                     break
             # YfinanceFetcher failed or not found
             error_summary = f"美股/美股指数 {stock_code} 获取失败:\n" + "\n".join(errors)
-            logger.error(error_summary)
+            elapsed = time.time() - request_start
+            logger.error(f"[数据源终止] {stock_code} 获取失败: elapsed={elapsed:.2f}s\n{error_summary}")
             raise DataFetchError(error_summary)
 
-        for fetcher in self._fetchers:
+        for attempt, fetcher in enumerate(self._fetchers, start=1):
             try:
-                logger.info(f"尝试使用 [{fetcher.name}] 获取 {stock_code}...")
+                logger.info(f"[数据源尝试 {attempt}/{total_fetchers}] [{fetcher.name}] 获取 {stock_code}...")
                 df = fetcher.get_daily_data(
                     stock_code=stock_code,
                     start_date=start_date,
@@ -509,19 +560,31 @@ class DataFetcherManager:
                 )
                 
                 if df is not None and not df.empty:
-                    logger.info(f"[{fetcher.name}] 成功获取 {stock_code}")
+                    elapsed = time.time() - request_start
+                    logger.info(
+                        f"[数据源完成] {stock_code} 使用 [{fetcher.name}] 获取成功: "
+                        f"rows={len(df)}, elapsed={elapsed:.2f}s"
+                    )
                     return df, fetcher.name
                     
             except Exception as e:
-                error_msg = f"[{fetcher.name}] 失败: {str(e)}"
-                logger.warning(error_msg)
+                error_type, error_reason = summarize_exception(e)
+                error_msg = f"[{fetcher.name}] ({error_type}) {error_reason}"
+                logger.warning(
+                    f"[数据源失败 {attempt}/{total_fetchers}] [{fetcher.name}] {stock_code}: "
+                    f"error_type={error_type}, reason={error_reason}"
+                )
                 errors.append(error_msg)
+                if attempt < total_fetchers:
+                    next_fetcher = self._fetchers[attempt]
+                    logger.info(f"[数据源切换] {stock_code}: [{fetcher.name}] -> [{next_fetcher.name}]")
                 # 继续尝试下一个数据源
                 continue
         
         # 所有数据源都失败
         error_summary = f"所有数据源获取 {stock_code} 失败:\n" + "\n".join(errors)
-        logger.error(error_summary)
+        elapsed = time.time() - request_start
+        logger.error(f"[数据源终止] {stock_code} 获取失败: elapsed={elapsed:.2f}s\n{error_summary}")
         raise DataFetchError(error_summary)
     
     @property

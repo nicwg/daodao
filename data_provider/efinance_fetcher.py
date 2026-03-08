@@ -94,6 +94,8 @@ class EfinanceRealtimeQuote:
 
 logger = logging.getLogger(__name__)
 
+EASTMONEY_HISTORY_ENDPOINT = "push2his.eastmoney.com/api/qt/stock/kline/get"
+
 
 # User-Agent 池，用于随机轮换
 USER_AGENTS = [
@@ -151,6 +153,51 @@ def _is_us_code(stock_code: str) -> bool:
     return bool(re.match(r'^[A-Z]{1,5}(\.[A-Z])?$', code))
 
 
+def _classify_eastmoney_error(exc: Exception) -> Tuple[str, str]:
+    """
+    Classify Eastmoney request failures into stable log categories.
+    """
+    message = str(exc).strip()
+    lowered = message.lower()
+
+    remote_disconnect_keywords = (
+        'remotedisconnected',
+        'remote end closed connection without response',
+        'connection aborted',
+        'connection broken',
+        'protocolerror',
+    )
+    timeout_keywords = (
+        'timeout',
+        'timed out',
+        'readtimeout',
+        'connecttimeout',
+    )
+    rate_limit_keywords = (
+        'banned',
+        'blocked',
+        '频率',
+        'rate limit',
+        'too many requests',
+        '429',
+        '限制',
+        'forbidden',
+        '403',
+    )
+
+    if any(keyword in lowered for keyword in remote_disconnect_keywords):
+        return "remote_disconnect", message
+    if isinstance(exc, (TimeoutError, requests.exceptions.Timeout)) or any(
+        keyword in lowered for keyword in timeout_keywords
+    ):
+        return "timeout", message
+    if any(keyword in lowered for keyword in rate_limit_keywords):
+        return "rate_limit_or_anti_bot", message
+    if isinstance(exc, requests.exceptions.RequestException):
+        return "request_error", message
+    return "unknown_request_error", message
+
+
 class EfinanceFetcher(BaseFetcher):
     """
     Efinance 数据源实现
@@ -187,6 +234,25 @@ class EfinanceFetcher(BaseFetcher):
         # 东财补丁开启才执行打补丁操作
         if get_config().enable_eastmoney_patch:
             eastmoney_patch()
+
+    @staticmethod
+    def _build_history_failure_message(
+        stock_code: str,
+        beg_date: str,
+        end_date: str,
+        exc: Exception,
+        elapsed: float,
+        is_etf: bool = False,
+    ) -> Tuple[str, str]:
+        category, detail = _classify_eastmoney_error(exc)
+        instrument_type = "ETF" if is_etf else "stock"
+        message = (
+            "Eastmoney 历史K线接口失败: "
+            f"endpoint={EASTMONEY_HISTORY_ENDPOINT}, stock_code={stock_code}, "
+            f"market_type={instrument_type}, range={beg_date}~{end_date}, "
+            f"category={category}, error_type={type(exc).__name__}, elapsed={elapsed:.2f}s, detail={detail}"
+        )
+        return category, message
     
     def _set_random_user_agent(self) -> None:
         """
@@ -288,10 +354,8 @@ class EfinanceFetcher(BaseFetcher):
         logger.info(f"[API调用] ef.stock.get_quote_history(stock_codes={stock_code}, "
                    f"beg={beg_date}, end={end_date_fmt}, klt=101, fqt=1)")
         
+        api_start = time.time()
         try:
-            import time as _time
-            api_start = _time.time()
-            
             # 调用 efinance 获取 A 股日线数据
             # klt=101 获取日线数据
             # fqt=1 获取前复权数据
@@ -303,29 +367,44 @@ class EfinanceFetcher(BaseFetcher):
                 fqt=1     # 前复权
             )
             
-            api_elapsed = _time.time() - api_start
+            api_elapsed = time.time() - api_start
             
             # 记录返回数据摘要
             if df is not None and not df.empty:
-                logger.info(f"[API返回] ef.stock.get_quote_history 成功: 返回 {len(df)} 行数据, 耗时 {api_elapsed:.2f}s")
+                logger.info(
+                    "[API返回] Eastmoney 历史K线成功: "
+                    f"endpoint={EASTMONEY_HISTORY_ENDPOINT}, stock_code={stock_code}, "
+                    f"range={beg_date}~{end_date_fmt}, rows={len(df)}, elapsed={api_elapsed:.2f}s"
+                )
                 logger.info(f"[API返回] 列名: {list(df.columns)}")
                 if '日期' in df.columns:
                     logger.info(f"[API返回] 日期范围: {df['日期'].iloc[0]} ~ {df['日期'].iloc[-1]}")
                 logger.debug(f"[API返回] 最新3条数据:\n{df.tail(3).to_string()}")
             else:
-                logger.warning(f"[API返回] ef.stock.get_quote_history 返回空数据, 耗时 {api_elapsed:.2f}s")
+                logger.warning(
+                    "[API返回] Eastmoney 历史K线为空: "
+                    f"endpoint={EASTMONEY_HISTORY_ENDPOINT}, stock_code={stock_code}, "
+                    f"range={beg_date}~{end_date_fmt}, elapsed={api_elapsed:.2f}s"
+                )
             
             return df
             
         except Exception as e:
-            error_msg = str(e).lower()
-            
-            # 检测反爬封禁
-            if any(keyword in error_msg for keyword in ['banned', 'blocked', '频率', 'rate', '限制']):
-                logger.warning(f"检测到可能被封禁: {e}")
-                raise RateLimitError(f"efinance 可能被限流: {e}") from e
-            
-            raise DataFetchError(f"efinance 获取数据失败: {e}") from e
+            api_elapsed = time.time() - api_start
+            category, failure_message = self._build_history_failure_message(
+                stock_code=stock_code,
+                beg_date=beg_date,
+                end_date=end_date_fmt,
+                exc=e,
+                elapsed=api_elapsed,
+            )
+
+            if category == "rate_limit_or_anti_bot":
+                logger.warning(failure_message)
+                raise RateLimitError(f"efinance 可能被限流: {failure_message}") from e
+
+            logger.error(failure_message)
+            raise DataFetchError(f"efinance 获取数据失败: {failure_message}") from e
     
     def _fetch_etf_data(self, stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
         """
@@ -363,10 +442,8 @@ class EfinanceFetcher(BaseFetcher):
         logger.info(f"[API调用] ef.stock.get_quote_history(stock_codes={stock_code}, "
                      f"beg={beg_date}, end={end_date_fmt}, klt=101, fqt=1)  [ETF]")
 
+        api_start = time.time()
         try:
-            import time as _time
-            api_start = _time.time()
-
             # ETFs are exchange-traded securities; use the stock API to get full OHLCV data
             df = ef.stock.get_quote_history(
                 stock_codes=stock_code,
@@ -376,28 +453,44 @@ class EfinanceFetcher(BaseFetcher):
                 fqt=1     # forward-adjusted
             )
 
-            api_elapsed = _time.time() - api_start
+            api_elapsed = time.time() - api_start
 
             if df is not None and not df.empty:
-                logger.info(f"[API返回] ef.stock.get_quote_history [ETF] 成功: 返回 {len(df)} 行数据, 耗时 {api_elapsed:.2f}s")
+                logger.info(
+                    "[API返回] Eastmoney 历史K线成功 [ETF]: "
+                    f"endpoint={EASTMONEY_HISTORY_ENDPOINT}, stock_code={stock_code}, "
+                    f"range={beg_date}~{end_date_fmt}, rows={len(df)}, elapsed={api_elapsed:.2f}s"
+                )
                 logger.info(f"[API返回] 列名: {list(df.columns)}")
                 if '日期' in df.columns:
                     logger.info(f"[API返回] 日期范围: {df['日期'].iloc[0]} ~ {df['日期'].iloc[-1]}")
                 logger.debug(f"[API返回] 最新3条数据:\n{df.tail(3).to_string()}")
             else:
-                logger.warning(f"[API返回] ef.stock.get_quote_history [ETF] 返回空数据, 耗时 {api_elapsed:.2f}s")
+                logger.warning(
+                    "[API返回] Eastmoney 历史K线为空 [ETF]: "
+                    f"endpoint={EASTMONEY_HISTORY_ENDPOINT}, stock_code={stock_code}, "
+                    f"range={beg_date}~{end_date_fmt}, elapsed={api_elapsed:.2f}s"
+                )
 
             return df
 
         except Exception as e:
-            error_msg = str(e).lower()
+            api_elapsed = time.time() - api_start
+            category, failure_message = self._build_history_failure_message(
+                stock_code=stock_code,
+                beg_date=beg_date,
+                end_date=end_date_fmt,
+                exc=e,
+                elapsed=api_elapsed,
+                is_etf=True,
+            )
 
-            # Detect anti-crawler ban
-            if any(keyword in error_msg for keyword in ['banned', 'blocked', '频率', 'rate', '限制']):
-                logger.warning(f"检测到可能被封禁: {e}")
-                raise RateLimitError(f"efinance 可能被限流: {e}") from e
+            if category == "rate_limit_or_anti_bot":
+                logger.warning(failure_message)
+                raise RateLimitError(f"efinance 可能被限流: {failure_message}") from e
 
-            raise DataFetchError(f"efinance 获取 ETF 数据失败: {e}") from e
+            logger.error(failure_message)
+            raise DataFetchError(f"efinance 获取 ETF 数据失败: {failure_message}") from e
     
     def _normalize_data(self, df: pd.DataFrame, stock_code: str) -> pd.DataFrame:
         """

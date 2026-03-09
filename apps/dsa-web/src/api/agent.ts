@@ -1,5 +1,10 @@
 import apiClient from './index';
+import { API_BASE_URL } from '../utils/constants';
 import { createApiError, isApiRequestError, parseApiError } from './error';
+
+export interface ChatStreamOptions {
+  signal?: AbortSignal;
+}
 
 export interface ChatRequest {
   message: string;
@@ -65,12 +70,31 @@ export const agentApi = {
   async deleteChatSession(sessionId: string): Promise<void> {
     await apiClient.delete(`/api/v1/agent/chat/sessions/${sessionId}`);
   },
-  async chatStream(payload: ChatStreamRequest): Promise<Response> {
+  async sendChat(content: string): Promise<{ success: boolean }> {
+    const response = await apiClient.post<{
+      success: boolean;
+      error?: string;
+      message?: string;
+    }>('/api/v1/agent/chat/send', { content });
+    const data = response.data;
+    if (data.success === false) {
+      throw new Error(data.message || '发送失败');
+    }
+    return { success: true };
+  },
+  async chatStream(
+    payload: ChatStreamRequest,
+    options?: ChatStreamOptions,
+  ): Promise<Response> {
+    const base = API_BASE_URL || '';
+    const url = `${base}/api/v1/agent/chat/stream`;
     try {
-      const response = await fetch('/api/v1/agent/chat/stream', {
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+        credentials: 'include',
+        signal: options?.signal,
       });
 
       if (response.ok) {
@@ -101,6 +125,9 @@ export const agentApi = {
       });
     } catch (error: unknown) {
       if (isApiRequestError(error)) {
+        throw error;
+      }
+      if (error instanceof Error && error.name === 'AbortError') {
         throw error;
       }
 

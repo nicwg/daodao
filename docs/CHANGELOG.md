@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - 🔎 **Fetcher failure observability** — historical data logs now record fetcher start/success/failure with elapsed time, explicit failover transitions, and clearer final outcomes; Efinance/Eastmoney failures now include upstream endpoint and normalized categories such as `remote_disconnect` and `timeout`; Akshare 新浪/腾讯实时行情日志 now also include upstream endpoint and classified failures for HTTP status, disconnects, and malformed payloads
 
 ### Added
+- **Agent 问股导出与发送** (#495) — 问股页面新增「导出会话」按钮，将会话保存为本地 .md 文件；新增「发送」按钮，将会话发送到已配置的通知渠道（企业微信/飞书/邮件等）；新增 `POST /api/v1/agent/chat/send` 接口
+- **Agent 问股后台执行** (#495) — 问股分析在切换页面后继续执行，不中断；完成时在 Dock 问股图标显示角标提示；切换会话或新建会话时自动取消进行中的流式请求
 - **Report Engine P0** — Pydantic schema validation for LLM JSON output; Jinja2 templates (`report_markdown.j2`, `report_wechat.j2`, `report_brief.j2`) with fallback to legacy string concatenation; content integrity checks with conditional retry and placeholder fill; brief mode (`REPORT_TYPE=brief`) for 3-5 sentence summaries; history comparison service for signal changes across recent analyses
 - **Report config** — `REPORT_TEMPLATES_DIR`, `REPORT_RENDERER_ENABLED`, `REPORT_INTEGRITY_ENABLED`, `REPORT_INTEGRITY_RETRY`, `REPORT_HISTORY_COMPARE_N`; `REPORT_TYPE` now supports `brief`
 - **智能导入 (P1)** — 支持图片、CSV/Excel、剪贴板多源导入；Vision LLM 同时提取代码+名称+置信度；名称→代码解析引擎（本地映射+拼音+AkShare fallback）；置信度分层确认（高自动勾选、中/低需人工确认）；统一预览与合并流程
@@ -29,6 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **parse_import 日志优化** — 文件读取失败、JSON 解析失败、parse 失败时记录文件类型、大小、错误摘要，便于排查。
 - **AkShare 缓存说明** — `docs/full-guide.md` 补充名称解析 AkShare fallback 的 1h TTL 缓存说明。
 - **Fetcher failure observability** — historical data logs now record fetcher start/success/failure with elapsed time, explicit failover transitions, and clearer final outcomes; Efinance/Eastmoney failures now include upstream endpoint and normalized categories such as `remote_disconnect` and `timeout`; Akshare 新浪/腾讯实时行情日志 now also include upstream endpoint and classified failures for HTTP status, disconnects, and malformed payloads
+
+### Fixed
+- **问股取消与切换** (#495) — 用户取消流式请求时不再误报为失败；快速切换会话时不再覆盖新 stream 状态
 
 ## [3.4.10] - 2026-03-07
 

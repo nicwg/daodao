@@ -1151,7 +1151,7 @@ class AkshareFetcher(BaseFetcher):
             
             data_str = content[data_start+1:data_end]
             fields = data_str.split('~')
-            
+
             if len(fields) < 45:
                 failure_message = _build_realtime_failure_message(
                     source_name="腾讯",
@@ -1171,7 +1171,7 @@ class AkshareFetcher(BaseFetcher):
             
             # 腾讯数据字段顺序（完整）：
             # 1:名称 2:代码 3:最新价 4:昨收 5:今开 6:成交量(手) 7:外盘 8:内盘
-            # 9-28:买卖五档 30:时间戳 31:涨跌额 32:涨跌幅(%) 33:今开 34:最高 35:最低/成交量/成交额
+            # 9-28:买卖五档 30:时间戳 31:涨跌额 32:涨跌幅(%) 33:最高 34:最低 35:收盘/成交量/成交额
             # 36:成交量(手) 37:成交额(万) 38:换手率(%) 39:市盈率 43:振幅(%)
             # 44:流通市值(亿) 45:总市值(亿) 46:市净率 47:涨停价 48:跌停价 49:量比
             # 使用 realtime_types.py 中的统一转换函数
@@ -1184,8 +1184,8 @@ class AkshareFetcher(BaseFetcher):
                 change_amount=safe_float(fields[31]) if len(fields) > 31 else None,
                 volume=safe_int(fields[6]) * 100 if fields[6] else None,  # 腾讯返回的是手，转为股
                 open_price=safe_float(fields[5]),
-                high=safe_float(fields[34]) if len(fields) > 34 else None,
-                low=safe_float(fields[35].split('/')[0]) if len(fields) > 35 and '/' in str(fields[35]) else safe_float(fields[35]) if len(fields) > 35 else None,
+                high=safe_float(fields[33]) if len(fields) > 33 else None,  # 修正：字段 33 是最高价
+                low=safe_float(fields[34]) if len(fields) > 34 else None,  # 修正：字段 34 是最低价
                 pre_close=safe_float(fields[4]),
                 turnover_rate=safe_float(fields[38]) if len(fields) > 38 else None,
                 amplitude=safe_float(fields[43]) if len(fields) > 43 else None,
@@ -1301,9 +1301,9 @@ class AkshareFetcher(BaseFetcher):
                 volume_ratio=safe_float(row.get('量比')),
                 turnover_rate=safe_float(row.get('换手率')),
                 amplitude=safe_float(row.get('振幅')),
-                open_price=safe_float(row.get('今开')),
-                high=safe_float(row.get('最高')),
-                low=safe_float(row.get('最低')),
+                open_price=safe_float(row.get('开盘价')),
+                high=safe_float(row.get('最高价')),
+                low=safe_float(row.get('最低价')),
                 total_mv=safe_float(row.get('总市值')),
                 circ_mv=safe_float(row.get('流通市值')),
                 high_52w=safe_float(row.get('52周最高')),

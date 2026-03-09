@@ -253,7 +253,7 @@ class EfinanceFetcher(BaseFetcher):
             f"category={category}, error_type={type(exc).__name__}, elapsed={elapsed:.2f}s, detail={detail}"
         )
         return category, message
-    
+
     def _set_random_user_agent(self) -> None:
         """
         设置随机 User-Agent

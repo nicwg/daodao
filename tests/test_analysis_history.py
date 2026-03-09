@@ -193,6 +193,77 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         self.assertIsInstance(detail.get("raw_result"), dict)
         self.assertIsNone(detail.get("model_used"))
 
+    def test_history_detail_prefers_raw_sniper_strings(self) -> None:
+        """History detail should display the original sniper point strings from raw_result."""
+        result = self._build_result()
+        result.dashboard = {
+            "battle_plan": {
+                "sniper_points": {
+                    "ideal_buy": "理想买入点：125.5元",
+                    "secondary_buy": "120-121 元分批",
+                    "stop_loss": "跌破 110 元止损",
+                    "take_profit": "目标位：150.0元",
+                }
+            }
+        }
+
+        saved = self.db.save_analysis_history(
+            result=result,
+            query_id="query_006",
+            report_type="simple",
+            news_content="新闻摘要",
+            context_snapshot=None,
+            save_snapshot=False
+        )
+        self.assertEqual(saved, 1)
+
+        with self.db.get_session() as session:
+            row = session.query(AnalysisHistory).filter(AnalysisHistory.query_id == "query_006").first()
+            if row is None:
+                self.fail("未找到保存的历史记录")
+            record_id = row.id
+
+        service = HistoryService(self.db)
+        detail = service.get_history_detail_by_id(record_id)
+        self.assertIsNotNone(detail)
+        self.assertEqual(detail.get("ideal_buy"), "理想买入点：125.5元")
+        self.assertEqual(detail.get("secondary_buy"), "120-121 元分批")
+        self.assertEqual(detail.get("stop_loss"), "跌破 110 元止损")
+        self.assertEqual(detail.get("take_profit"), "目标位：150.0元")
+
+    def test_history_detail_falls_back_to_numeric_sniper_columns(self) -> None:
+        """History detail should still fall back to stored numeric sniper columns when raw strings are unavailable."""
+        result = self._build_result()
+        saved = self.db.save_analysis_history(
+            result=result,
+            query_id="query_007",
+            report_type="simple",
+            news_content="新闻摘要",
+            context_snapshot=None,
+            save_snapshot=False
+        )
+        self.assertEqual(saved, 1)
+
+        with self.db.get_session() as session:
+            row = session.query(AnalysisHistory).filter(AnalysisHistory.query_id == "query_007").first()
+            if row is None:
+                self.fail("未找到保存的历史记录")
+            row.ideal_buy = 125.5
+            row.secondary_buy = 120.0
+            row.stop_loss = 110.0
+            row.take_profit = 150.0
+            row.raw_result = json.dumps({"model_used": "gemini/gemini-2.0-flash"})
+            session.commit()
+            record_id = row.id
+
+        service = HistoryService(self.db)
+        detail = service.get_history_detail_by_id(record_id)
+        self.assertIsNotNone(detail)
+        self.assertEqual(detail.get("ideal_buy"), "125.5")
+        self.assertEqual(detail.get("secondary_buy"), "120.0")
+        self.assertEqual(detail.get("stop_loss"), "110.0")
+        self.assertEqual(detail.get("take_profit"), "150.0")
+
 
 if __name__ == "__main__":
     unittest.main()

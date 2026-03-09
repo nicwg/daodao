@@ -31,6 +31,7 @@ for optional_module in ("litellm", "json_repair"):
 
 from src.config import Config
 from src.notification import NotificationService, NotificationChannel
+from src.analyzer import AnalysisResult
 import requests
 
 
@@ -170,6 +171,79 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
 
         self.assertTrue(ok)
         self.assertAlmostEqual(mock_post.call_count, 4, delta=1)
+
+
+class TestNotificationServiceReportGeneration(unittest.TestCase):
+    """报告生成与选路相关测试。"""
+
+    @mock.patch("src.notification.get_config")
+    def test_generate_aggregate_report_routes_by_report_type(self, mock_get_config: mock.MagicMock):
+        mock_get_config.return_value = _make_config()
+        service = NotificationService()
+        result = AnalysisResult(
+            code="600519",
+            name="贵州茅台",
+            sentiment_score=72,
+            trend_prediction="看多",
+            operation_advice="持有",
+            analysis_summary="稳健",
+        )
+
+        with mock.patch.object(service, "generate_dashboard_report", return_value="dashboard") as mock_dashboard, mock.patch.object(
+            service, "generate_brief_report", return_value="brief"
+        ) as mock_brief:
+            self.assertEqual(service.generate_aggregate_report([result], "simple"), "dashboard")
+            self.assertEqual(service.generate_aggregate_report([result], "full"), "dashboard")
+            self.assertEqual(service.generate_aggregate_report([result], "detailed"), "dashboard")
+            self.assertEqual(service.generate_aggregate_report([result], "brief"), "brief")
+
+        self.assertEqual(mock_dashboard.call_count, 3)
+        mock_brief.assert_called_once()
+
+    @mock.patch("src.notification.get_config")
+    def test_generate_single_stock_report_keeps_legacy_simple_format(self, mock_get_config: mock.MagicMock):
+        mock_get_config.return_value = _make_config(report_renderer_enabled=True)
+        service = NotificationService()
+        result = AnalysisResult(
+            code="600519",
+            name="贵州茅台",
+            sentiment_score=72,
+            trend_prediction="看多",
+            operation_advice="持有",
+            analysis_summary="稳健",
+        )
+
+        with mock.patch("src.services.report_renderer.render") as mock_render:
+            out = service.generate_single_stock_report(result)
+
+        mock_render.assert_not_called()
+        self.assertIn("贵州茅台", out)
+        self.assertIn("600519", out)
+
+    @mock.patch("src.notification.get_config")
+    def test_history_compare_context_uses_cache(self, mock_get_config: mock.MagicMock):
+        mock_get_config.return_value = _make_config(report_history_compare_n=3)
+        service = NotificationService()
+        result = AnalysisResult(
+            code="600519",
+            name="贵州茅台",
+            sentiment_score=72,
+            trend_prediction="看多",
+            operation_advice="持有",
+            analysis_summary="稳健",
+            query_id="q-1",
+        )
+
+        with mock.patch(
+            "src.services.history_comparison_service.get_signal_changes_batch",
+            return_value={"600519": []},
+        ) as mock_batch:
+            first = service._get_history_compare_context([result])
+            second = service._get_history_compare_context([result])
+
+        self.assertEqual(first, {"history_by_code": {"600519": []}})
+        self.assertEqual(second, {"history_by_code": {"600519": []}})
+        mock_batch.assert_called_once()
 
     @mock.patch("src.notification.get_config")
     @mock.patch("smtplib.SMTP_SSL")

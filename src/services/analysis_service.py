@@ -74,8 +74,13 @@ class AnalysisService:
                 query_source="api"
             )
             
-            # 确定报告类型
-            rt = ReportType.FULL if report_type == "detailed" else ReportType.SIMPLE
+            # 确定报告类型 (API: simple/detailed/brief -> ReportType)
+            if report_type == "detailed":
+                rt = ReportType.FULL
+            elif report_type == "brief":
+                rt = ReportType.BRIEF
+            else:
+                rt = ReportType.SIMPLE
             
             # 执行分析
             result = pipeline.process_single_stock(

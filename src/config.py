@@ -197,6 +197,13 @@ class Config:
     # 仅分析结果摘要：true 时只推送汇总，不含个股详情（Issue #262）
     report_summary_only: bool = False
 
+    # Report Engine P0: Jinja2 renderer and integrity checks
+    report_templates_dir: str = "templates"  # Template directory (relative to project root)
+    report_renderer_enabled: bool = False  # Enable Jinja2 rendering (default off for zero regression)
+    report_integrity_enabled: bool = True  # Content integrity validation after LLM output
+    report_integrity_retry: int = 1  # Retry count when mandatory fields missing (0 = placeholder only)
+    report_history_compare_n: int = 0  # History comparison count (0 = disabled)
+
     # PushPlus 推送配置
     pushplus_token: Optional[str] = None  # PushPlus Token
     pushplus_topic: Optional[str] = None  # PushPlus 群组编码（一对多推送）
@@ -631,8 +638,13 @@ class Config:
             astrbot_url=os.getenv('ASTRBOT_URL'),
             astrbot_token=os.getenv('ASTRBOT_TOKEN'),
             single_stock_notify=os.getenv('SINGLE_STOCK_NOTIFY', 'false').lower() == 'true',
-            report_type=os.getenv('REPORT_TYPE', 'simple').lower(),
+            report_type=cls._parse_report_type(os.getenv('REPORT_TYPE', 'simple')),
             report_summary_only=os.getenv('REPORT_SUMMARY_ONLY', 'false').lower() == 'true',
+            report_templates_dir=os.getenv('REPORT_TEMPLATES_DIR', 'templates'),
+            report_renderer_enabled=os.getenv('REPORT_RENDERER_ENABLED', 'false').lower() == 'true',
+            report_integrity_enabled=os.getenv('REPORT_INTEGRITY_ENABLED', 'true').lower() == 'true',
+            report_integrity_retry=int(os.getenv('REPORT_INTEGRITY_RETRY', '1')),
+            report_history_compare_n=int(os.getenv('REPORT_HISTORY_COMPARE_N', '0')),
             analysis_delay=float(os.getenv('ANALYSIS_DELAY', '0')),
             merge_email_notification=os.getenv('MERGE_EMAIL_NOTIFICATION', 'false').lower() == 'true',
             feishu_max_bytes=int(os.getenv('FEISHU_MAX_BYTES', '20000')),
@@ -938,6 +950,18 @@ class Config:
             if 'stocks' in g and 'emails' in g and g['stocks'] and g['emails']:
                 result.append((g['stocks'], g['emails']))
         return result
+
+    @classmethod
+    def _parse_report_type(cls, value: str) -> str:
+        """Parse REPORT_TYPE, fallback to simple for invalid values (supports brief)."""
+        v = (value or 'simple').strip().lower()
+        if v in ('simple', 'full', 'brief'):
+            return v
+        import logging
+        logging.getLogger(__name__).warning(
+            f"REPORT_TYPE '{value}' invalid, fallback to 'simple' (valid: simple/full/brief)"
+        )
+        return 'simple'
 
     @classmethod
     def _parse_market_review_region(cls, value: str) -> str:

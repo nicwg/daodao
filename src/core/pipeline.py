@@ -317,6 +317,7 @@ class StockAnalysisPipeline:
 
             # Step 7.5: 填充分析时的价格信息到 result
             if result:
+                result.query_id = query_id
                 realtime_data = enhanced_context.get('realtime', {})
                 result.current_price = realtime_data.get('price')
                 result.change_pct = realtime_data.get('change_pct')
@@ -533,6 +534,19 @@ class StockAnalysisPipeline:
 
             # 转换为 AnalysisResult
             result = self._agent_result_to_analysis_result(agent_result, code, stock_name, report_type, query_id)
+            if result:
+                result.query_id = query_id
+            # Agent weak integrity: placeholder fill only, no LLM retry
+            if result and getattr(self.config, "report_integrity_enabled", False):
+                from src.analyzer import check_content_integrity, apply_placeholder_fill
+
+                pass_integrity, missing = check_content_integrity(result)
+                if not pass_integrity:
+                    apply_placeholder_fill(result, missing)
+                    logger.info(
+                        "[LLM完整性] integrity_mode=agent_weak 必填字段缺失 %s，已占位补全",
+                        missing,
+                    )
             resolved_stock_name = result.name if result and result.name else stock_name
 
             # 保存新闻情报到数据库（Agent 工具结果仅用于 LLM 上下文，未持久化，Fixes #396）
@@ -908,11 +922,12 @@ class StockAnalysisPipeline:
                     try:
                         # 根据报告类型选择生成方法
                         if report_type == ReportType.FULL:
-                            # 完整报告：使用决策仪表盘格式
                             report_content = self.notifier.generate_dashboard_report([result])
                             logger.info(f"[{code}] 使用完整报告格式")
+                        elif report_type == ReportType.BRIEF:
+                            report_content = self.notifier.generate_brief_report([result])
+                            logger.info(f"[{code}] 使用简洁报告格式")
                         else:
-                            # 精简报告：使用单股报告格式（默认）
                             report_content = self.notifier.generate_single_stock_report(result)
                             logger.info(f"[{code}] 使用精简报告格式")
                         
@@ -986,7 +1001,12 @@ class StockAnalysisPipeline:
         single_stock_notify = getattr(self.config, 'single_stock_notify', False)
         # Issue #119: 从配置读取报告类型
         report_type_str = getattr(self.config, 'report_type', 'simple').lower()
-        report_type = ReportType.FULL if report_type_str == 'full' else ReportType.SIMPLE
+        if report_type_str == 'brief':
+            report_type = ReportType.BRIEF
+        elif report_type_str == 'full':
+            report_type = ReportType.FULL
+        else:
+            report_type = ReportType.SIMPLE
         # Issue #128: 从配置读取分析间隔
         analysis_delay = getattr(self.config, 'analysis_delay', 0)
 
@@ -1051,17 +1071,22 @@ class StockAnalysisPipeline:
             if single_stock_notify:
                 # 单股推送模式：只保存汇总报告，不再重复推送
                 logger.info("单股推送模式：跳过汇总推送，仅保存报告到本地")
-                self._send_notifications(results, skip_push=True)
+                self._send_notifications(results, report_type, skip_push=True)
             elif merge_notification:
                 # 合并模式（Issue #190）：仅保存，不推送，由 main 层合并个股+大盘后统一发送
                 logger.info("合并推送模式：跳过本次推送，将在个股+大盘复盘后统一发送")
-                self._send_notifications(results, skip_push=True)
+                self._send_notifications(results, report_type, skip_push=True)
             else:
-                self._send_notifications(results)
+                self._send_notifications(results, report_type)
         
         return results
     
-    def _send_notifications(self, results: List[AnalysisResult], skip_push: bool = False) -> None:
+    def _send_notifications(
+        self,
+        results: List[AnalysisResult],
+        report_type: ReportType = ReportType.SIMPLE,
+        skip_push: bool = False,
+    ) -> None:
         """
         发送分析结果通知
         
@@ -1073,9 +1098,7 @@ class StockAnalysisPipeline:
         """
         try:
             logger.info("生成决策仪表盘日报...")
-            
-            # 生成决策仪表盘格式的详细日报
-            report = self.notifier.generate_dashboard_report(results)
+            report = self._generate_aggregate_report(results, report_type)
             
             # 保存到本地
             filepath = self.notifier.save_report_to_file(report)
@@ -1130,7 +1153,10 @@ class StockAnalysisPipeline:
                 # 企业微信：只发精简版（平台限制）
                 wechat_success = False
                 if NotificationChannel.WECHAT in channels:
-                    dashboard_content = self.notifier.generate_wechat_dashboard(results)
+                    if report_type == ReportType.BRIEF:
+                        dashboard_content = self.notifier.generate_brief_report(results)
+                    else:
+                        dashboard_content = self.notifier.generate_wechat_dashboard(results)
                     logger.info(f"企业微信仪表盘长度: {len(dashboard_content)} 字符")
                     logger.debug(f"企业微信推送内容:\n{dashboard_content}")
                     wechat_image_bytes = None
@@ -1185,7 +1211,7 @@ class StockAnalysisPipeline:
                                 key = tuple(recs) if recs else None
                                 emails_to_results[key].append(r)
                             for key, group_results in emails_to_results.items():
-                                grp_report = self.notifier.generate_dashboard_report(group_results)
+                                grp_report = self._generate_aggregate_report(group_results, report_type)
                                 grp_image_bytes = None
                                 if channel.value in self.notifier._markdown_to_image_channels:
                                     grp_image_bytes = markdown_to_image(
@@ -1248,3 +1274,16 @@ class StockAnalysisPipeline:
                 
         except Exception as e:
             logger.error(f"发送通知失败: {e}")
+
+    def _generate_aggregate_report(
+        self,
+        results: List[AnalysisResult],
+        report_type: ReportType,
+    ) -> str:
+        """Generate aggregate report with backward-compatible notifier fallback."""
+        generator = getattr(self.notifier, "generate_aggregate_report", None)
+        if callable(generator):
+            return generator(results, report_type)
+        if report_type == ReportType.BRIEF and hasattr(self.notifier, "generate_brief_report"):
+            return self.notifier.generate_brief_report(results)
+        return self.notifier.generate_dashboard_report(results)

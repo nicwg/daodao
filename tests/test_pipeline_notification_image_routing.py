@@ -16,6 +16,7 @@ from tests.litellm_stub import ensure_litellm_stub
 ensure_litellm_stub()
 
 from src.core.pipeline import StockAnalysisPipeline, NotificationChannel
+from src.enums import ReportType
 
 
 class _FakeNotifier:
@@ -62,7 +63,7 @@ class TestPipelineEmailGroupImageRouting(unittest.TestCase):
         pipeline = self._build_pipeline()
         results = self._make_results()
 
-        pipeline._send_notifications(results)
+        pipeline._send_notifications(results, ReportType.SIMPLE)
 
         self.assertEqual(pipeline.notifier._send_email_with_inline_image.call_count, 2)
         pipeline.notifier.send_to_email.assert_not_called()
@@ -75,7 +76,7 @@ class TestPipelineEmailGroupImageRouting(unittest.TestCase):
         pipeline = self._build_pipeline()
         results = self._make_results()
 
-        pipeline._send_notifications(results)
+        pipeline._send_notifications(results, ReportType.SIMPLE)
 
         pipeline.notifier._send_email_with_inline_image.assert_not_called()
         self.assertEqual(pipeline.notifier.send_to_email.call_count, 2)
@@ -111,7 +112,7 @@ class TestPipelineWechatOnlyImageRouting(unittest.TestCase):
         results = [SimpleNamespace(code="000001")]
 
         with patch("src.md2img.markdown_to_image", return_value=b"wechat-image") as mock_md2img:
-            pipeline._send_notifications(results)
+            pipeline._send_notifications(results, ReportType.SIMPLE)
 
         mock_md2img.assert_called_once_with(
             "wechat-dashboard", max_chars=pipeline.notifier._markdown_to_image_max_chars
@@ -128,7 +129,7 @@ class TestPipelineWechatOnlyImageRouting(unittest.TestCase):
         with patch("src.md2img.markdown_to_image", return_value=None), patch(
             "src.core.pipeline.get_config", return_value=SimpleNamespace(md2img_engine="wkhtmltoimage")
         ), patch("src.core.pipeline.logger.warning") as mock_warning:
-            pipeline._send_notifications(results)
+            pipeline._send_notifications(results, ReportType.SIMPLE)
 
         pipeline.notifier._send_wechat_image.assert_not_called()
         pipeline.notifier.send_to_wechat.assert_called_once_with("wechat-dashboard")

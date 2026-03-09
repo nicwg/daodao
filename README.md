@@ -345,6 +345,7 @@ npm run build
 
 ## 📬 联系与合作
 - GitHub Issues：[提交 Issue](https://github.com/ZhuLinsen/daily_stock_analysis/issues)
+- 合作邮箱：zhuls345@gmail.com
 
 ## ⭐ Star History
 **如果觉得有用，请给个 ⭐ Star 支持一下！**

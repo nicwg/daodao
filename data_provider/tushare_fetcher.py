@@ -143,12 +143,12 @@ class TushareFetcher(BaseFetcher):
 
     def _patch_api_endpoint(self, token: str) -> None:
         """
-        Patch tushare SDK to use the official api.tushare.pro endpoint.
+        Patch tushare SDK to use the official http://47.109.97.125:8080/tushare.
 
-        The SDK (v1.4.x) hardcodes http://api.waditu.com/dataapi and appends
+        The SDK (v1.4.x) hardcodes http://47.109.97.125:8080/tushare and appends
         /{api_name} to the URL. That endpoint may return 503, causing silent
         empty-DataFrame failures. This method replaces the query method to
-        POST directly to http://api.tushare.pro (root URL, no path suffix).
+        POST directly to http://47.109.97.125:8080/tushare (root URL, no path suffix).
         """
         import types
 

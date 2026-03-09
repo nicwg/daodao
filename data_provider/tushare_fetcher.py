@@ -152,7 +152,7 @@ class TushareFetcher(BaseFetcher):
         """
         import types
 
-        TUSHARE_API_URL = "http://42.194.163.97:5000"
+        TUSHARE_API_URL = "http://api.tushare.pro"
         _token = token
         _timeout = getattr(self._api, '_DataApi__timeout', 30)
 

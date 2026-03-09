@@ -22,6 +22,7 @@ from litellm import Router
 
 from src.agent.llm_adapter import get_thinking_extra_body
 from src.config import Config, get_config, get_api_keys_for_model, extra_litellm_params
+from src.storage import persist_llm_usage
 from src.data.stock_mapping import STOCK_NAME_MAP
 from src.schemas.report_schema import AnalysisReportSchema
 
@@ -617,7 +618,7 @@ class GeminiAnalyzer:
         """Check if LiteLLM is properly configured with at least one API key."""
         return self._router is not None or self._litellm_available
 
-    def _call_litellm(self, prompt: str, generation_config: dict) -> Tuple[str, str]:
+    def _call_litellm(self, prompt: str, generation_config: dict) -> Tuple[str, str, Dict[str, Any]]:
         """Call LLM via litellm with fallback across configured models.
 
         When channels/YAML are configured, every model goes through the Router
@@ -630,7 +631,8 @@ class GeminiAnalyzer:
             generation_config: Dict with optional keys: temperature, max_output_tokens, max_tokens.
 
         Returns:
-            Tuple of (response text, model_used). On success model_used is the full model name.
+            Tuple of (response text, model_used, usage). On success model_used is the full model
+            name and usage is a dict with prompt_tokens, completion_tokens, total_tokens.
         """
         config = get_config()
         max_tokens = (
@@ -677,7 +679,14 @@ class GeminiAnalyzer:
                     response = litellm.completion(**call_kwargs)
 
                 if response and response.choices and response.choices[0].message.content:
-                    return (response.choices[0].message.content, model)
+                    usage: Dict[str, Any] = {}
+                    if response.usage:
+                        usage = {
+                            "prompt_tokens": response.usage.prompt_tokens or 0,
+                            "completion_tokens": response.usage.completion_tokens or 0,
+                            "total_tokens": response.usage.total_tokens or 0,
+                        }
+                    return (response.choices[0].message.content, model, usage)
                 raise ValueError("LLM returned empty response")
 
             except Exception as e:
@@ -712,7 +721,11 @@ class GeminiAnalyzer:
                 prompt,
                 generation_config={"max_tokens": max_tokens, "temperature": temperature},
             )
-            return result[0] if isinstance(result, tuple) else result
+            if isinstance(result, tuple):
+                text, model_used, usage = result
+                persist_llm_usage(usage, model_used, call_type="market_review")
+                return text
+            return result
         except Exception as exc:
             logger.error("[generate_text] LLM call failed: %s", exc)
             return None
@@ -804,7 +817,7 @@ class GeminiAnalyzer:
 
             while True:
                 start_time = time.time()
-                response_text, model_used = self._call_litellm(current_prompt, generation_config)
+                response_text, model_used, llm_usage = self._call_litellm(current_prompt, generation_config)
                 elapsed = time.time() - start_time
 
                 # 记录响应信息
@@ -849,6 +862,8 @@ class GeminiAnalyzer:
                         missing_fields,
                     )
                     break
+
+            persist_llm_usage(llm_usage, model_used, call_type="analysis", stock_code=code)
 
             logger.info(f"[LLM解析] {name}({code}) 分析完成: {result.trend_prediction}, 评分 {result.sentiment_score}")
 

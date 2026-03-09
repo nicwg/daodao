@@ -4,7 +4,7 @@ import { useAuth, useSystemConfig } from '../hooks';
 import { ApiErrorAlert } from '../components/common';
 import {
   ChangePasswordCard,
-  ImageStockExtractor,
+  IntelligentImport,
   LLMChannelEditor,
   SettingsAlert,
   SettingsField,
@@ -148,7 +148,7 @@ const SettingsPage: React.FC = () => {
           <section className="space-y-3 rounded-2xl border border-white/8 bg-card/60 p-4 backdrop-blur-sm">
             {activeCategory === 'base' ? (
               <div className="space-y-3">
-                <ImageStockExtractor
+                <IntelligentImport
                   stockListValue={
                     (activeItems.find((i) => i.key === 'STOCK_LIST')?.value as string) ?? ''
                   }

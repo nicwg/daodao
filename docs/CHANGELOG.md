@@ -9,10 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Changed
-- 🔎 **Fetcher failure observability** — historical data logs now record fetcher start/success/failure with elapsed time, explicit failover transitions, and clearer final outcomes; Efinance/Eastmoney failures now include upstream endpoint and normalized categories such as `remote_disconnect` and `timeout`; Akshare 新浪/腾讯实时行情日志 now also include upstream endpoint and classified failures for HTTP status, disconnects, and malformed payloads
 ### Added
+- **智能导入 (P1)** — 支持图片、CSV/Excel、剪贴板多源导入；Vision LLM 同时提取代码+名称+置信度；名称→代码解析引擎（本地映射+拼音+AkShare fallback）；置信度分层确认（高自动勾选、中/低需人工确认）；统一预览与合并流程
+- **EXTRACT_PROMPT 文档** — `docs/image-extract-prompt.md` 记录完整 prompt 便于 PR 审查；PR 模板新增 EXTRACT_PROMPT 变更展示区块
 - 📖 **LLM 配置指南** — 新增 [docs/LLM_CONFIG_GUIDE.md](LLM_CONFIG_GUIDE.md)，系统讲解三层配置、快速上手、Vision/Agent/Web UI/校验排错；同步更新 README、full-guide、.env.example、FAQ、英文版指南
+
+### Changed
+- **API 响应扩展（兼容提醒）** — `POST /api/v1/stocks/extract-from-image` 响应新增 `items` 字段（`code/name/confidence` 明细）；保留 `codes` 以兼容旧客户端。对严格 JSON Schema 且不接受未知字段的客户端，需评估并适配该字段变更。
+- **parse-import 错误信息细化** — Excel 解析失败时增加可操作提示（格式、工作表、损坏）；CSV 解析失败（如引号未闭合、列数不一致）时返回具体原因；`docs/full-guide.md` 补充列名说明与常见解析失败场景。
+- **parse_import 日志优化** — 文件读取失败、JSON 解析失败、parse 失败时记录文件类型、大小、错误摘要，便于排查。
+- **AkShare 缓存说明** — `docs/full-guide.md` 补充名称解析 AkShare fallback 的 1h TTL 缓存说明。
+- **Fetcher failure observability** — historical data logs now record fetcher start/success/failure with elapsed time, explicit failover transitions, and clearer final outcomes; Efinance/Eastmoney failures now include upstream endpoint and normalized categories such as `remote_disconnect` and `timeout`; Akshare 新浪/腾讯实时行情日志 now also include upstream endpoint and classified failures for HTTP status, disconnects, and malformed payloads
 
 ## [3.4.10] - 2026-03-07
 
@@ -28,12 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **markdown-to-file engine** (#455) — `MD2IMG_ENGINE=markdown-to-file` 可选，对 emoji 支持更好，需 `npm i -g markdown-to-file`
 - **PREFETCH_REALTIME_QUOTES** (#455) — 设为 `false` 可禁用实时行情预取，避免 efinance/akshare_em 全市场拉取
 - **Stock name prefetch** (#455) — 分析前预取股票名称，减少报告中「股票xxxxx」占位符
+- 📊 **分析报告模型标记** (#528, #534) — 在分析报告 meta、报告末尾、推送内容中展示 `model_used`（完整 LLM 模型名）；Agent 多轮调用时记录并展示每轮实际使用的模型（支持 fallback 切换）
 
 ### Changed
 - **Enhanced markdown-to-image failure warning** (#455) — 转图失败时提示具体依赖（wkhtmltopdf 或 m2f）
 - **WeChat-only image routing optimization** (#455) — 仅配置企业微信图片时，不再对完整报告做冗余转图，避免误导性失败日志
 - **Stock name prefetch lightweight mode** (#455) — 名称预取阶段跳过 realtime quote 查询，减少额外网络开销
-- 📊 **分析报告模型标记** (#528, #534) — 在分析报告 meta、报告末尾、推送内容中展示 `model_used`（完整 LLM 模型名）；Agent 多轮调用时记录并展示每轮实际使用的模型（支持 fallback 切换）
 
 ## [3.4.9] - 2026-03-06
 
@@ -798,7 +805,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-[Unreleased]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.4.7...HEAD
+[Unreleased]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.4.10...HEAD
+[3.4.10]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.4.9...v3.4.10
+[3.4.9]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.4.8...v3.4.9
+[3.4.8]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.4.7...v3.4.8
 [3.4.7]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.4.0...v3.4.7
 [3.4.0]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.3.22...v3.4.0
 [3.3.22]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.3.12...v3.3.22

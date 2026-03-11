@@ -5,6 +5,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from src.config import Config
 from src.core.config_manager import ConfigManager
@@ -72,6 +73,22 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         validation = self.service.validate(items=[{"key": "SCHEDULE_TIME", "value": "25:70"}])
         self.assertFalse(validation["valid"])
         self.assertTrue(any(issue["code"] == "invalid_format" for issue in validation["issues"]))
+
+    def test_validate_reports_invalid_searxng_url(self) -> None:
+        validation = self.service.validate(items=[{"key": "SEARXNG_BASE_URLS", "value": "searx.local,https://ok.example"}])
+        self.assertFalse(validation["valid"])
+        self.assertTrue(any(issue["code"] == "invalid_url" for issue in validation["issues"]))
+
+    @patch("src.search_service.reset_search_service")
+    def test_update_with_reload_resets_search_service_singleton(self, mock_reset_search_service) -> None:
+        response = self.service.update(
+            config_version=self.manager.get_config_version(),
+            items=[{"key": "STOCK_LIST", "value": "600519"}],
+            reload_now=True,
+        )
+
+        self.assertTrue(response["success"])
+        mock_reset_search_service.assert_called_once()
 
     def test_update_raises_conflict_for_stale_version(self) -> None:
         with self.assertRaises(ConfigConflictError):

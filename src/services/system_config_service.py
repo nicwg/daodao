@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 import re
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
+from urllib.parse import urlparse
 
 from src.config import Config, setup_env
 from src.core.config_manager import ConfigManager
@@ -137,6 +138,9 @@ class SystemConfigService:
         if reload_now:
             try:
                 Config.reset_instance()
+                from src.search_service import reset_search_service
+
+                reset_search_service()
                 setup_env(override=True)
                 config = Config.get_instance()
                 warnings = config.validate()
@@ -274,6 +278,26 @@ class SystemConfigService:
                 }
             )
 
+        if validation.get("item_type") == "url":
+            delimiter = validation.get("delimiter", ",")
+            values = [item.strip() for item in value.split(delimiter)] if validation.get("multi_value") else [value.strip()]
+            allowed_schemes = tuple(validation.get("allowed_schemes", ["http", "https"]))
+            invalid_values = [
+                item for item in values
+                if item and not SystemConfigService._is_valid_url(item, allowed_schemes=allowed_schemes)
+            ]
+            if invalid_values:
+                issues.append(
+                    {
+                        "key": key,
+                        "code": "invalid_url",
+                        "message": "Value must contain valid URLs with scheme and host",
+                        "severity": "error",
+                        "expected": ",".join(allowed_schemes) + " URL(s)",
+                        "actual": ", ".join(invalid_values[:3]),
+                    }
+                )
+
         return issues
 
     @staticmethod
@@ -305,6 +329,12 @@ class SystemConfigService:
                 }
             )
         return issues
+
+    @staticmethod
+    def _is_valid_url(value: str, allowed_schemes: Tuple[str, ...]) -> bool:
+        """Return True when *value* looks like a valid absolute URL."""
+        parsed = urlparse(value)
+        return parsed.scheme in allowed_schemes and bool(parsed.netloc)
 
     @staticmethod
     def _validate_cross_field(effective_map: Dict[str, str], updated_keys: Set[str]) -> List[Dict[str, Any]]:

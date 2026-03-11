@@ -25,7 +25,7 @@ from src.config import get_config, Config
 from src.storage import get_db
 from data_provider import DataFetcherManager
 from data_provider.realtime_types import ChipDistribution
-from src.analyzer import GeminiAnalyzer, AnalysisResult
+from src.analyzer import GeminiAnalyzer, AnalysisResult, fill_chip_structure_if_needed
 from src.data.stock_mapping import STOCK_NAME_MAP
 from src.notification import NotificationService, NotificationChannel
 from src.search_service import SearchService
@@ -322,6 +322,10 @@ class StockAnalysisPipeline:
                 result.current_price = realtime_data.get('price')
                 result.change_pct = realtime_data.get('change_pct')
 
+            # Step 7.6: chip_structure fallback (Issue #589)
+            if result and chip_data:
+                fill_chip_structure_if_needed(result, chip_data)
+
             # Step 8: 保存分析历史记录
             if result:
                 try:
@@ -547,6 +551,10 @@ class StockAnalysisPipeline:
                         "[LLM完整性] integrity_mode=agent_weak 必填字段缺失 %s，已占位补全",
                         missing,
                     )
+            # chip_structure fallback (Issue #589), before save_analysis_history
+            if result and chip_data:
+                fill_chip_structure_if_needed(result, chip_data)
+
             resolved_stock_name = result.name if result and result.name else stock_name
 
             # 保存新闻情报到数据库（Agent 工具结果仅用于 LLM 上下文，未持久化，Fixes #396）

@@ -38,6 +38,7 @@ def _make_config(**kwargs) -> Config:
         tavily_api_keys=[],
         brave_api_keys=[],
         serpapi_keys=[],
+        searxng_base_urls=[],
         wechat_webhook_url="https://example.com/webhook",
         feishu_webhook_url=None,
         telegram_bot_token=None,
@@ -222,6 +223,13 @@ class TestValidateStructuredNotification:
         issues = cfg.validate_structured()
         info = [i for i in issues if i.severity == "info"]
         assert any("搜索引擎" in i.message for i in info)
+
+    def test_searxng_configured_no_search_info(self):
+        """When searxng_base_urls is configured, no 'unconfigured search engine' info."""
+        cfg = _make_config(searxng_base_urls=["https://searx.example.org"])
+        issues = cfg.validate_structured()
+        info = [i for i in issues if i.severity == "info"]
+        assert not any("搜索引擎" in i.message and "未配置" in i.message for i in info)
 
 
 # ---------------------------------------------------------------------------

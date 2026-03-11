@@ -299,7 +299,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "MINIMAX_API_KEYS": {
         "title": "MiniMax API Key",
-        "description": "MiniMax API key (search priority: Bocha > MiniMax > Tavily > Brave > SerpAPI).",
+        "description": "MiniMax API key (search priority: Bocha > Tavily > Brave > SerpAPI > MiniMax > SearXNG).",
         "category": "data_source",
         "data_type": "string",
         "ui_control": "password",
@@ -309,6 +309,25 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": None,
         "options": [],
         "validation": {"multi_value": True, "delimiter": ","},
+        "display_order": 53,
+    },
+    "SEARXNG_BASE_URLS": {
+        "title": "SearXNG Base URLs",
+        "description": "Comma-separated SearXNG instance URLs (self-hosted, no quota). Enable format: json in settings.yml.",
+        "category": "data_source",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": None,
+        "options": [],
+        "validation": {
+            "multi_value": True,
+            "delimiter": ",",
+            "item_type": "url",
+            "allowed_schemes": ["http", "https"],
+        },
         "display_order": 52,
     },
     "ENABLE_REALTIME_QUOTE": {
@@ -1495,6 +1514,7 @@ def _infer_category(key: str) -> str:
             "SERPAPI",
             "BRAVE",
             "BOCHA",
+            "SEARXNG",
             "NEWS_",
             "BIAS_",
         )

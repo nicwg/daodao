@@ -363,6 +363,7 @@ git push -u origin main
 | `TAVILY_API_KEYS` | Tavily 搜索 API Key | 推荐 |
 | `MINIMAX_API_KEYS` | MiniMax Coding Plan Web Search | 可选 |
 | `SERPAPI_API_KEYS` | SerpAPI Key | 可选 |
+| `SEARXNG_BASE_URLS` | SearXNG 自建实例（无配额兜底，需在 settings.yml 启用 format: json） | 可选 |
 | `TUSHARE_TOKEN` | Tushare Token | 可选 |
 | `GEMINI_MODEL` | 模型名称（默认 gemini-2.0-flash） | 可选 |
 

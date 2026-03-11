@@ -10,8 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- feat(search): add SearXNG support as quota-free fallback (Fixes #550)
 - 📊 **LLM cost tracking** — all LLM calls (analysis, agent, market review) are recorded in the `llm_usage` table; new `GET /api/v1/usage/summary?period=today|month|all` endpoint returns aggregated token usage broken down by call type and model
 ### Fixed
+- 🐛 **筹码结构 LLM 未填写时兜底补全** (#589) — DeepSeek 等模型未正确填写 `chip_structure` 时，自动用数据源已获取的筹码数据补全，保证各模型展示一致；普通分析与 Agent 模式均生效
 - 🐛 **历史报告狙击点位显示原始文本** (#452) — 历史详情页现优先展示 `raw_result.dashboard.battle_plan.sniper_points` 中的原始字符串，避免 `analysis_history` 数值列把区间、说明文字或复杂点位压缩成单个数字；保留原有数值列作为回退
 
 ### Changed
@@ -36,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 - **问股取消与切换** (#495) — 用户取消流式请求时不再误报为失败；快速切换会话时不再覆盖新 stream 状态
+- fix(status): add MiniMax search status display in /status command (#587)
 
 ## [3.4.10] - 2026-03-07
 

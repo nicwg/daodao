@@ -9,9 +9,12 @@ on:
     paths:
       - '**.py'
       - '**.md'
+      - '**.ts'
+      - '**.tsx'
       - 'docs/**'
       - 'README.md'
       - 'AGENTS.md'
+      - 'apps/dsa-web/**'
       - 'requirements.txt'
       - 'pyproject.toml'
       - 'setup.cfg'

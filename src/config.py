@@ -15,6 +15,7 @@ import os
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Tuple
+from urllib.parse import urlparse
 from dotenv import load_dotenv, dotenv_values
 from dataclasses import dataclass, field
 
@@ -135,6 +136,7 @@ class Config:
     tavily_api_keys: List[str] = field(default_factory=list)  # Tavily API Keys
     brave_api_keys: List[str] = field(default_factory=list)  # Brave Search API Keys
     serpapi_keys: List[str] = field(default_factory=list)  # SerpAPI Keys
+    searxng_base_urls: List[str] = field(default_factory=list)  # SearXNG instance URLs (self-hosted, no quota)
 
     # === 新闻与分析筛选配置 ===
     news_max_age_days: int = 3   # 新闻最大时效（天）
@@ -547,6 +549,22 @@ class Config:
         brave_keys_str = os.getenv('BRAVE_API_KEYS', '')
         brave_api_keys = [k.strip() for k in brave_keys_str.split(',') if k.strip()]
 
+        _raw_urls = [u.strip() for u in os.getenv('SEARXNG_BASE_URLS', '').split(',') if u.strip()]
+        searxng_base_urls = []
+        invalid_searxng_urls = []
+        for u in _raw_urls:
+            p = urlparse(u)
+            if p.scheme in ('http', 'https') and p.netloc:
+                searxng_base_urls.append(u)
+            else:
+                invalid_searxng_urls.append(u)
+        if invalid_searxng_urls:
+            import logging
+            logging.getLogger(__name__).warning(
+                "SEARXNG_BASE_URLS 中存在无效 URL，已忽略: %s",
+                ", ".join(invalid_searxng_urls[:3]),
+            )
+
         # 企微消息类型与最大字节数逻辑
         wechat_msg_type = os.getenv('WECHAT_MSG_TYPE', 'markdown')
         wechat_msg_type_lower = wechat_msg_type.lower()
@@ -608,6 +626,7 @@ class Config:
             tavily_api_keys=tavily_api_keys,
             brave_api_keys=brave_api_keys,
             serpapi_keys=serpapi_keys,
+            searxng_base_urls=searxng_base_urls,
             news_max_age_days=max(1, int(os.getenv('NEWS_MAX_AGE_DAYS', '3'))),
             bias_threshold=max(1.0, float(os.getenv('BIAS_THRESHOLD', '5.0'))),
             agent_mode=os.getenv('AGENT_MODE', 'false').lower() == 'true',
@@ -1118,10 +1137,11 @@ class Config:
             or self.tavily_api_keys
             or self.brave_api_keys
             or self.serpapi_keys
+            or self.searxng_base_urls
         ):
             issues.append(ConfigIssue(
                 severity="info",
-                message="未配置搜索引擎 API Key (Bocha/MiniMax/Tavily/Brave/SerpAPI)，新闻搜索功能将不可用",
+                message="未配置搜索引擎 API Key (Bocha/MiniMax/Tavily/Brave/SerpAPI/SearXNG)，新闻搜索功能将不可用",
                 field="BOCHA_API_KEY",
             ))
 

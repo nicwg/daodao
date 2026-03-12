@@ -10,12 +10,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- 📊 **Web UI 详细报告按钮** (Fixes #214) — 历史记录页面新增「详细报告」按钮，点击后在右侧抽屉展示与推送通知格式一致的完整 Markdown 分析报告；新增 `GET /api/v1/history/{record_id}/markdown` API 端点
 - feat(search): add SearXNG support as quota-free fallback (Fixes #550)
 - 📊 **LLM cost tracking** — all LLM calls (analysis, agent, market review) are recorded in the `llm_usage` table; new `GET /api/v1/usage/summary?period=today|month|all` endpoint returns aggregated token usage broken down by call type and model
 - ⚙️ **GitHub Actions LiteLLM 配置支持** — 工作流新增 `LITELLM_CONFIG`、`LITELLM_API_KEY`、`LITELLM_MODEL`、`LITELLM_CONFIG_YAML` 环境变量，支持使用提交 `litellm_config.yaml` 文件方式，或将 `litellm_config.yaml` 配置写入 GitHub Actions Variables 或 Secret 的方式，以实现灵活配置所有 AI 提供商（包括 siliconflow、AIHubMix 等），与本地环境保持一致；配置诊断步骤新增 LiteLLM 状态检查；`litellm_config.example.yaml` 新增 siliconflow 提供商配置示例
+- 🤖 **Agent models discovery API** — 新增 `GET /api/v1/agent/models`，返回当前配置下的可用模型部署列表（含 `primary`/`fallback`/`source`/`api_base` 元数据），供 Web UI 模型选择器直接使用
 ### Fixed
+- **GitHub Actions 筹码分布可配置** (#617) — workflow 不再硬编码 ENABLE_CHIP_DISTRIBUTION=false，支持通过 vars/secrets 覆盖；默认仍为 false 保持云端稳定性
+- 🐛 **analyze_trend 始终报 No historical data** (#600) — 根因：错误依赖 get_analysis_context 的 raw_data（该接口从未返回）；修复：改为优先 db.get_data_range、备选 DataFetcherManager 获取历史数据，与 pipeline 一致
 - 🐛 **筹码结构 LLM 未填写时兜底补全** (#589) — DeepSeek 等模型未正确填写 `chip_structure` 时，自动用数据源已获取的筹码数据补全，保证各模型展示一致；普通分析与 Agent 模式均生效
 - 🐛 **历史报告狙击点位显示原始文本** (#452) — 历史详情页现优先展示 `raw_result.dashboard.battle_plan.sniper_points` 中的原始字符串，避免 `analysis_history` 数值列把区间、说明文字或复杂点位压缩成单个数字；保留原有数值列作为回退
+- 🐛 **`.env` 设置保存保留注释与空行** — Web 设置页更新配置时不再破坏原有 `.env` 注释、空白分隔和未知行格式，降低手工维护配置文件的冲突风险
+- 🐛 **Agent legacy model discovery now includes direct LiteLLM env providers** — `/api/v1/agent/models` 在 `legacy_env` 模式下不再漏掉 `cohere/...` 等通过环境变量直连的 LiteLLM-native provider；配置校验也与运行时保持一致，不再把这类模型误报为“未配置任何 LLM”
+- 🐛 **Agent model source/provider detection aligned with runtime** — `/api/v1/agent/models` 现使用 `Config` 内部记录的实际生效配置来源标注 `source`；legacy 模式下无前缀 OpenAI 模型名（如 `gpt-4o-mini`）不再被误判为 `unknown`，避免模型列表错误为空
+- 🐛 **Agent legacy fallback deployments now match runtime reachability** — `/api/v1/agent/models` 在 legacy 多 Key 模式下不再为 fallback 模型按每个 key 展开 deployment；仅主模型保留多 deployment 暴露，避免 Web UI 展示无法实际命中的 fallback 选项
+- 🐛 **Stooq 美股兜底昨收价语义修正** — 不再将开盘价误作为昨收价；当 yfinance 被限流或失败时，兜底行情会尝试从 Stooq 日线历史获取上一交易日收盘价，缺失时不展示涨跌幅/振幅等衍生指标，避免误导
+- 🐛 **股票名称轻量预取回归修复** — `get_stock_name(..., allow_realtime=False)` 现会在远程名称查询前优先返回本地 `STOCK_NAME_MAP` 映射，避免已知代码在预取阶段仍遍历各数据源，降低延迟与上游限流风险（当前处于基础功能验证阶段）
 
 ### Changed
 - 🔎 **Fetcher failure observability** — historical data logs now record fetcher start/success/failure with elapsed time, explicit failover transitions, and clearer final outcomes; Efinance/Eastmoney failures now include upstream endpoint and normalized categories such as `remote_disconnect` and `timeout`; Akshare 新浪/腾讯实时行情日志 now also include upstream endpoint and classified failures for HTTP status, disconnects, and malformed payloads

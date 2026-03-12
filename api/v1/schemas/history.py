@@ -147,12 +147,12 @@ class ReportDetails(BaseModel):
 
 class AnalysisReport(BaseModel):
     """完整分析报告"""
-    
+
     meta: ReportMeta = Field(..., description="元信息")
     summary: ReportSummary = Field(..., description="概览区")
     strategy: Optional[ReportStrategy] = Field(None, description="策略点位区")
     details: Optional[ReportDetails] = Field(None, description="详情区")
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -177,5 +177,18 @@ class AnalysisReport(BaseModel):
                     "take_profit": "2000.00"
                 },
                 "details": None
+            }
+        }
+
+
+class MarkdownReportResponse(BaseModel):
+    """Markdown 格式报告响应"""
+
+    content: str = Field(..., description="Markdown 格式的完整报告内容")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "content": "# 📊 贵州茅台 (600519) 分析报告\n\n> 分析日期：**2024-01-01**\n\n..."
             }
         }

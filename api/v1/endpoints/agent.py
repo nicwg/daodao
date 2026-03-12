@@ -14,6 +14,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from src.config import get_config
+from src.services.agent_model_service import list_agent_model_deployments
 
 # Tool name -> Chinese display name mapping
 TOOL_DISPLAY_NAMES: Dict[str, str] = {
@@ -55,6 +56,31 @@ class StrategyInfo(BaseModel):
 
 class StrategiesResponse(BaseModel):
     strategies: List[StrategyInfo]
+
+
+class AgentModelDeployment(BaseModel):
+    deployment_id: str
+    model: str
+    provider: str
+    source: str
+    api_base: Optional[str] = None
+    deployment_name: Optional[str] = None
+    is_primary: bool = False
+    is_fallback: bool = False
+
+
+class AgentModelsResponse(BaseModel):
+    models: List[AgentModelDeployment]
+
+
+@router.get("/models", response_model=AgentModelsResponse)
+async def get_agent_models():
+    """Get configured Agent model deployments for frontend selection."""
+    config = get_config()
+    return AgentModelsResponse(
+        models=[AgentModelDeployment(**item) for item in list_agent_model_deployments(config)]
+    )
+
 
 @router.get("/strategies", response_model=StrategiesResponse)
 async def get_strategies():

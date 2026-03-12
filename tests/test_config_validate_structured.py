@@ -201,6 +201,15 @@ class TestValidateStructuredLLM:
         assert llm_issues, "Expected an info issue about LITELLM_MODEL"
         assert all(i.severity == "info" for i in llm_issues)
 
+    def test_direct_env_provider_model_without_model_list_no_error(self):
+        """Direct LiteLLM env providers should count as configured for runtime."""
+        cfg = _make_config(
+            llm_model_list=[],
+            litellm_model="cohere/command-r-plus",
+        )
+        issues = cfg.validate_structured()
+        assert not any(i.severity == "error" and "LLM" in i.message for i in issues)
+
 
 # ---------------------------------------------------------------------------
 # validate_structured() — notification & search

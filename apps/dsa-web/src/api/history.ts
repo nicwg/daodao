@@ -67,4 +67,14 @@ export const historyApi = {
       items: (data.items || []).map(item => toCamelCase<NewsIntelItem>(item)),
     };
   },
+
+  /**
+   * 获取历史报告的 Markdown 格式内容
+   * @param recordId 分析历史记录主键 ID
+   * @returns Markdown 格式的完整报告内容
+   */
+  getMarkdown: async (recordId: number): Promise<string> => {
+    const response = await apiClient.get<{ content: string }>(`/api/v1/history/${recordId}/markdown`);
+    return response.data.content;
+  },
 };

@@ -158,6 +158,7 @@
 | `AGENT_MAX_STEPS` | Agent 最大推理步数（默认 10） | 可选 |
 | `AGENT_STRATEGY_DIR` | 自定义策略目录（默认内置 `strategies/`） | 可选 |
 | `TRADING_DAY_CHECK_ENABLED` | 交易日检查（默认 `true`）：非交易日跳过执行；设为 `false` 或使用 `--force-run` 强制执行 | 可选 |
+| `ENABLE_CHIP_DISTRIBUTION` | 启用筹码分布（Actions 默认 false；需筹码数据时在 Variables 中设为 true，接口可能不稳定） | 可选 |
 
 #### 3. 启用 Actions
 
@@ -277,6 +278,10 @@ python main.py
 **API**：`POST /api/v1/stocks/extract-from-image`（图片）、`POST /api/v1/stocks/parse-import`（文件/粘贴）。详见 [完整指南](docs/full-guide.md)。
 
 **LLM 用量查询**：`GET /api/v1/usage/summary?period=today|month|all`，返回按调用类型和模型分组的 token 消耗汇总（`total_calls`、`total_tokens`、`by_call_type`、`by_model`）。
+
+### 历史报告详情
+
+在首页历史记录中选择一条分析记录后，点击「详细报告」按钮可在右侧抽屉中查看与推送通知格式一致的完整 Markdown 分析报告，包含舆情情报、核心结论、数据透视、作战计划等完整内容。
 
 ### 🤖 Agent 策略问股
 

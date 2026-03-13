@@ -308,6 +308,20 @@ class Config:
     # 熔断器冷却时间（秒）
     circuit_breaker_cooldown: int = 300
 
+    # === 基本面聚合开关与降级保护 ===
+    # 全局总开关；关闭时返回 not_supported 并保持主流程无变化
+    enable_fundamental_pipeline: bool = True
+    # 基本面阶段总预算（秒）
+    fundamental_stage_timeout_seconds: float = 1.5
+    # 单能力源调用超时（秒）
+    fundamental_fetch_timeout_seconds: float = 0.8
+    # 单能力失败重试次数（已包含首次）
+    fundamental_retry_max: int = 1
+    # 基本面上下文短 TTL（秒）
+    fundamental_cache_ttl_seconds: int = 120
+    # 基本面缓存最大条目数（避免长时间运行内存增长）
+    fundamental_cache_max_entries: int = 256
+
     # Discord 机器人状态
     discord_bot_status: str = "A股智能分析 | /help"
 
@@ -770,7 +784,17 @@ class Config:
             # - tushare: Tushare Pro，需要2000积分，数据全面
             realtime_source_priority=cls._resolve_realtime_source_priority(),
             realtime_cache_ttl=int(os.getenv('REALTIME_CACHE_TTL', '600')),
-            circuit_breaker_cooldown=int(os.getenv('CIRCUIT_BREAKER_COOLDOWN', '300'))
+            circuit_breaker_cooldown=int(os.getenv('CIRCUIT_BREAKER_COOLDOWN', '300')),
+            enable_fundamental_pipeline=os.getenv('ENABLE_FUNDAMENTAL_PIPELINE', 'true').lower() == 'true',
+            fundamental_stage_timeout_seconds=float(
+                os.getenv('FUNDAMENTAL_STAGE_TIMEOUT_SECONDS', '1.5')
+            ),
+            fundamental_fetch_timeout_seconds=float(
+                os.getenv('FUNDAMENTAL_FETCH_TIMEOUT_SECONDS', '0.8')
+            ),
+            fundamental_retry_max=int(os.getenv('FUNDAMENTAL_RETRY_MAX', '1')),
+            fundamental_cache_ttl_seconds=int(os.getenv('FUNDAMENTAL_CACHE_TTL_SECONDS', '120')),
+            fundamental_cache_max_entries=int(os.getenv('FUNDAMENTAL_CACHE_MAX_ENTRIES', '256'))
         )
     
     @classmethod

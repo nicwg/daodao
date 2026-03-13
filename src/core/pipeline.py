@@ -106,7 +106,7 @@ class StockAnalysisPipeline:
             logger.info("搜索服务已启用 (Tavily/SerpAPI)")
         else:
             logger.warning("搜索服务未启用（未配置 API Key）")
-    
+
     def fetch_and_save_stock_data(
         self, 
         code: str,
@@ -229,9 +229,42 @@ class StockAnalysisPipeline:
                     use_agent = True
                     logger.info(f"{stock_name}({code}) Auto-enabled agent mode due to configured skills: {configured_skills}")
 
+            # Step 2.5: 基本面能力聚合（统一入口，异常降级）
+            # - 失败时返回 partial/failed，不影响既有技术面/新闻链路
+            # - 关闭开关时仍返回 not_supported 结构
+            fundamental_context = None
+            try:
+                fundamental_context = self.fetcher_manager.get_fundamental_context(
+                    code,
+                    budget_seconds=getattr(self.config, 'fundamental_stage_timeout_seconds', 1.5),
+                )
+            except Exception as e:
+                logger.warning(f"{stock_name}({code}) 基本面聚合失败: {e}")
+                fundamental_context = self.fetcher_manager.build_failed_fundamental_context(code, str(e))
+
+            # P0: write-only snapshot, fail-open, no read dependency on this table.
+            try:
+                self.db.save_fundamental_snapshot(
+                    query_id=query_id,
+                    code=code,
+                    payload=fundamental_context,
+                    source_chain=fundamental_context.get("source_chain", []),
+                    coverage=fundamental_context.get("coverage", {}),
+                )
+            except Exception as e:
+                logger.debug(f"{stock_name}({code}) 基本面快照写入失败: {e}")
+
             if use_agent:
                 logger.info(f"{stock_name}({code}) 启用 Agent 模式进行分析")
-                return self._analyze_with_agent(code, report_type, query_id, stock_name, realtime_quote, chip_data)
+                return self._analyze_with_agent(
+                    code,
+                    report_type,
+                    query_id,
+                    stock_name,
+                    realtime_quote,
+                    chip_data,
+                    fundamental_context,
+                )
             
             # Step 3: 趋势分析（基于交易理念）
             trend_result: Optional[TrendAnalysisResult] = None
@@ -307,9 +340,10 @@ class StockAnalysisPipeline:
             enhanced_context = self._enhance_context(
                 context, 
                 realtime_quote, 
-                chip_data, 
+                chip_data,
                 trend_result,
-                stock_name  # 传入股票名称
+                stock_name,  # 传入股票名称
+                fundamental_context,
             )
             
             # Step 7: 调用 AI 分析（传入增强的上下文和新闻）
@@ -359,7 +393,8 @@ class StockAnalysisPipeline:
         realtime_quote,
         chip_data: Optional[ChipDistribution],
         trend_result: Optional[TrendAnalysisResult],
-        stock_name: str = ""
+        stock_name: str = "",
+        fundamental_context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         增强分析上下文
@@ -500,6 +535,16 @@ class StockAnalysisPipeline:
             context.get('code', ''), enhanced.get('stock_name', stock_name)
         )
 
+        # P0: append unified fundamental block; keep as additional context only
+        enhanced["fundamental_context"] = (
+            fundamental_context
+            if isinstance(fundamental_context, dict)
+            else self.fetcher_manager.build_failed_fundamental_context(
+                context.get("code", ""),
+                "invalid fundamental context",
+            )
+        )
+
         return enhanced
 
     def _analyze_with_agent(
@@ -509,7 +554,8 @@ class StockAnalysisPipeline:
         query_id: str,
         stock_name: str,
         realtime_quote: Any,
-        chip_data: Optional[ChipDistribution]
+        chip_data: Optional[ChipDistribution],
+        fundamental_context: Optional[Dict[str, Any]] = None
     ) -> Optional[AnalysisResult]:
         """
         使用 Agent 模式分析单只股票。
@@ -525,6 +571,7 @@ class StockAnalysisPipeline:
                 "stock_code": code,
                 "stock_name": stock_name,
                 "report_type": report_type.value,
+                "fundamental_context": fundamental_context,
             }
             
             if realtime_quote:

@@ -331,7 +331,8 @@ class TestPipelineRouting(unittest.TestCase):
                 "600519", ReportType.SIMPLE, "q1",
                 pipeline.fetcher_manager.get_realtime_quote.return_value.name,
                 pipeline.fetcher_manager.get_realtime_quote.return_value,
-                pipeline.fetcher_manager.get_chip_distribution.return_value
+                pipeline.fetcher_manager.get_chip_distribution.return_value,
+                pipeline.fetcher_manager.get_fundamental_context.return_value,
             )
 
     def test_legacy_mode_does_not_call_agent(self):

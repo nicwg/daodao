@@ -1426,6 +1426,199 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "validation": {},
         "display_order": 40,
     },
+    "AGENT_NL_ROUTING": {
+        "title": "Agent NL Routing",
+        "description": "Enable natural-language routing in bot dispatcher. When on, high-confidence stock queries in private chat (or @mentions) are routed to the agent even without an explicit command.",
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 50,
+    },
+    "AGENT_ARCH": {
+        "title": "Agent Architecture",
+        "description": "Agent execution architecture. 'single' uses the classic ReAct executor; 'multi' uses the orchestrator pipeline with specialised sub-agents.",
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "select",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "single",
+        "options": [
+            {"label": "Single Agent", "value": "single"},
+            {"label": "Multi Agent (Orchestrator)", "value": "multi"},
+        ],
+        "validation": {},
+        "display_order": 60,
+    },
+    "AGENT_ORCHESTRATOR_MODE": {
+        "title": "Orchestrator Mode",
+        "description": "Pipeline mode when AGENT_ARCH=multi. 'quick' (tech→decision), 'standard' (tech→intel→decision), 'full' (tech→intel→risk→decision), 'strategy' (full + per-strategy agents).",
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "select",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "standard",
+        "options": [
+            {"label": "Quick", "value": "quick"},
+            {"label": "Standard", "value": "standard"},
+            {"label": "Full", "value": "full"},
+            {"label": "Strategy", "value": "strategy"},
+        ],
+        "validation": {},
+        "display_order": 61,
+    },
+    "AGENT_ORCHESTRATOR_TIMEOUT_S": {
+        "title": "Orchestrator Timeout",
+        "description": "Cooperative timeout budget in seconds for the whole multi-agent pipeline when AGENT_ARCH=multi. Set to 0 to disable.",
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "120",
+        "options": [],
+        "validation": {"min": 0, "max": 3600},
+        "display_order": 62,
+    },
+    "AGENT_RISK_OVERRIDE": {
+        "title": "Risk Agent Override",
+        "description": "Allow the risk agent to veto buy signals when critical risk flags are detected.",
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "true",
+        "options": [],
+        "validation": {},
+        "display_order": 63,
+    },
+    "AGENT_DEEP_RESEARCH_BUDGET": {
+        "title": "Deep Research Token Budget",
+        "description": "Maximum token budget for the deep research agent (/research command).",
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "30000",
+        "options": [],
+        "validation": {"min": 5000, "max": 100000},
+        "display_order": 64,
+    },
+    "AGENT_DEEP_RESEARCH_TIMEOUT": {
+        "title": "Deep Research Timeout",
+        "description": "Maximum seconds for the /research command before returning a timeout response. Prevents indefinite blocking on Bot platforms.",
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "180",
+        "options": [],
+        "validation": {"min": 30, "max": 600},
+        "display_order": 65,
+    },
+    "AGENT_MEMORY_ENABLED": {
+        "title": "Agent Memory",
+        "description": "Enable the memory & calibration system. Tracks prediction accuracy and adjusts agent confidence over time.",
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 66,
+    },
+    "AGENT_STRATEGY_AUTOWEIGHT": {
+        "title": "Auto-Weight Strategies",
+        "description": "Automatically weight strategy opinions by their historical backtest performance.",
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "true",
+        "options": [],
+        "validation": {},
+        "display_order": 67,
+    },
+    "AGENT_STRATEGY_ROUTING": {
+        "title": "Strategy Routing",
+        "description": "Strategy selection mode. 'auto' detects market regime and picks relevant strategies; 'manual' uses AGENT_SKILLS list only.",
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "select",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "auto",
+        "options": [
+            {"label": "Auto (Regime-based)", "value": "auto"},
+            {"label": "Manual (Use AGENT_SKILLS)", "value": "manual"},
+        ],
+        "validation": {},
+        "display_order": 68,
+    },
+    "AGENT_EVENT_MONITOR_ENABLED": {
+        "title": "Event Monitor",
+        "description": "Enable periodic EventMonitor checks in schedule mode. Triggered alerts are sent through the configured notification channels.",
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 69,
+    },
+    "AGENT_EVENT_MONITOR_INTERVAL_MINUTES": {
+        "title": "Event Monitor Interval",
+        "description": "Polling interval in minutes for EventMonitor background checks when schedule mode is running.",
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "5",
+        "options": [],
+        "validation": {"min": 1, "max": 1440},
+        "display_order": 70,
+    },
+    "AGENT_EVENT_ALERT_RULES_JSON": {
+        "title": "Event Alert Rules",
+        "description": "JSON array of serialized EventMonitor rules. Example: [{\"stock_code\":\"600519\",\"alert_type\":\"price_cross\",\"direction\":\"above\",\"price\":1800}]",
+        "category": "agent",
+        "data_type": "json",
+        "ui_control": "textarea",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [],
+        "validation": {},
+        "display_order": 71,
+    },
 }
 
 
@@ -1439,12 +1632,31 @@ def get_registered_field_keys() -> List[str]:
     return list(_FIELD_DEFINITIONS.keys())
 
 
+def _extract_option_values(options: List[Any]) -> List[str]:
+    """Extract canonical option values from string/object style select options."""
+    values: List[str] = []
+    for option in options:
+        if isinstance(option, str):
+            values.append(option)
+            continue
+        if isinstance(option, dict):
+            value = option.get("value")
+            if isinstance(value, str) and value:
+                values.append(value)
+    return values
+
+
 def get_field_definition(key: str, value_hint: Optional[str] = None) -> Dict[str, Any]:
     """Return field definition for key, including inferred fallback metadata."""
     key_upper = key.upper()
     if key_upper in _FIELD_DEFINITIONS:
         field = deepcopy(_FIELD_DEFINITIONS[key_upper])
         field["key"] = key_upper
+        validation = deepcopy(field.get("validation") or {})
+        option_values = _extract_option_values(field.get("options", []))
+        if field.get("ui_control") == "select" and option_values and "enum" not in validation:
+            validation["enum"] = option_values
+        field["validation"] = validation
         return field
 
     category = _infer_category(key_upper)

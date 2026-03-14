@@ -11,6 +11,7 @@ A股自选股智能分析系统 - 配置管理模块
 """
 
 import json
+import logging
 import os
 import re
 from pathlib import Path
@@ -334,9 +335,23 @@ class Config:
 
     # === Agent 模式配置 ===
     agent_mode: bool = False
+    _agent_mode_explicit: bool = False  # True when AGENT_MODE was explicitly set in env
     agent_max_steps: int = 10
     agent_skills: List[str] = field(default_factory=list)
     agent_strategy_dir: Optional[str] = None
+    agent_nl_routing: bool = False  # Enable natural language routing in bot dispatcher
+    agent_arch: str = "single"     # Agent architecture: 'single' (legacy) or 'multi' (orchestrator)
+    agent_orchestrator_mode: str = "standard"  # Orchestrator mode: quick/standard/full/strategy
+    agent_orchestrator_timeout_s: int = 600  # Cooperative timeout budget for the whole multi-agent pipeline
+    agent_risk_override: bool = True  # Allow risk agent to veto buy signals
+    agent_deep_research_budget: int = 30000  # Max token budget for deep research
+    agent_deep_research_timeout: int = 180  # Max seconds for /research command before returning timeout
+    agent_memory_enabled: bool = False  # Enable memory & calibration system
+    agent_strategy_autoweight: bool = True  # Auto-weight strategies by backtest performance
+    agent_strategy_routing: str = "auto"  # Strategy routing: 'auto' (regime-based) or 'manual'
+    agent_event_monitor_enabled: bool = False  # Enable periodic event-driven alert checks in schedule mode
+    agent_event_monitor_interval_minutes: int = 5  # Polling interval for event monitor background checks
+    agent_event_alert_rules_json: str = ""  # JSON array of serialized EventMonitor rules
 
     # === 通知配置（可同时配置多个，全部推送）===
     
@@ -543,6 +558,32 @@ class Config:
     # CONFIG_VALIDATE_MODE=warn (default): log all issues but always continue startup
     # CONFIG_VALIDATE_MODE=strict: exit(1) when any "error" severity issue is found
     config_validate_mode: str = "warn"
+
+    # --- Post-init validation ---------------------------------------------------
+    _VALID_AGENT_ARCH = {"single", "multi"}
+    _VALID_ORCHESTRATOR_MODES = {"quick", "standard", "full", "strategy"}
+    _VALID_STRATEGY_ROUTING = {"auto", "manual"}
+
+    def __post_init__(self) -> None:
+        _log = logging.getLogger(__name__)
+        if self.agent_arch not in self._VALID_AGENT_ARCH:
+            _log.warning(
+                "Invalid AGENT_ARCH=%r, falling back to 'single'. Valid: %s",
+                self.agent_arch, self._VALID_AGENT_ARCH,
+            )
+            object.__setattr__(self, "agent_arch", "single")
+        if self.agent_orchestrator_mode not in self._VALID_ORCHESTRATOR_MODES:
+            _log.warning(
+                "Invalid AGENT_ORCHESTRATOR_MODE=%r, falling back to 'standard'. Valid: %s",
+                self.agent_orchestrator_mode, self._VALID_ORCHESTRATOR_MODES,
+            )
+            object.__setattr__(self, "agent_orchestrator_mode", "standard")
+        if self.agent_strategy_routing not in self._VALID_STRATEGY_ROUTING:
+            _log.warning(
+                "Invalid AGENT_STRATEGY_ROUTING=%r, falling back to 'auto'. Valid: %s",
+                self.agent_strategy_routing, self._VALID_STRATEGY_ROUTING,
+            )
+            object.__setattr__(self, "agent_strategy_routing", "auto")
 
     # 单例实例存储
     _instance: Optional['Config'] = None
@@ -843,9 +884,23 @@ class Config:
             news_max_age_days=max(1, int(os.getenv('NEWS_MAX_AGE_DAYS', '3'))),
             bias_threshold=max(1.0, float(os.getenv('BIAS_THRESHOLD', '5.0'))),
             agent_mode=os.getenv('AGENT_MODE', 'false').lower() == 'true',
+            _agent_mode_explicit=os.getenv('AGENT_MODE') is not None,
             agent_max_steps=int(os.getenv('AGENT_MAX_STEPS', '10')),
             agent_skills=[s.strip() for s in os.getenv('AGENT_SKILLS', '').split(',') if s.strip()],
             agent_strategy_dir=os.getenv('AGENT_STRATEGY_DIR'),
+            agent_nl_routing=os.getenv('AGENT_NL_ROUTING', 'false').lower() == 'true',
+            agent_arch=os.getenv('AGENT_ARCH', 'single').lower(),
+            agent_orchestrator_mode=os.getenv('AGENT_ORCHESTRATOR_MODE', 'standard').lower(),
+            agent_orchestrator_timeout_s=max(0, int(os.getenv('AGENT_ORCHESTRATOR_TIMEOUT_S', '600'))),
+            agent_risk_override=os.getenv('AGENT_RISK_OVERRIDE', 'true').lower() == 'true',
+            agent_deep_research_budget=int(os.getenv('AGENT_DEEP_RESEARCH_BUDGET', '30000')),
+            agent_deep_research_timeout=max(30, int(os.getenv('AGENT_DEEP_RESEARCH_TIMEOUT', '180'))),
+            agent_memory_enabled=os.getenv('AGENT_MEMORY_ENABLED', 'false').lower() == 'true',
+            agent_strategy_autoweight=os.getenv('AGENT_STRATEGY_AUTOWEIGHT', 'true').lower() == 'true',
+            agent_strategy_routing=os.getenv('AGENT_STRATEGY_ROUTING', 'auto').lower(),
+            agent_event_monitor_enabled=os.getenv('AGENT_EVENT_MONITOR_ENABLED', 'false').lower() == 'true',
+            agent_event_monitor_interval_minutes=max(1, int(os.getenv('AGENT_EVENT_MONITOR_INTERVAL_MINUTES', '5'))),
+            agent_event_alert_rules_json=os.getenv('AGENT_EVENT_ALERT_RULES_JSON', ''),
             wechat_webhook_url=os.getenv('WECHAT_WEBHOOK_URL'),
             feishu_webhook_url=os.getenv('FEISHU_WEBHOOK_URL'),
             telegram_bot_token=os.getenv('TELEGRAM_BOT_TOKEN'),
@@ -1284,6 +1339,32 @@ class Config:
     def reset_instance(cls) -> None:
         """重置单例（主要用于测试）"""
         cls._instance = None
+
+    def is_agent_available(self) -> bool:
+        """Check whether agent capabilities are usable.
+
+        Decision table:
+
+        +-----------------------+-------------------+---------+
+        | AGENT_MODE env        | LITELLM_MODEL set | Result  |
+        +-----------------------+-------------------+---------+
+        | ``true``              | any               | True    |
+        | ``false`` (explicit)  | any               | False   |
+        | not set (default)     | yes               | True    |
+        | not set (default)     | no                | False   |
+        +-----------------------+-------------------+---------+
+
+        This keeps backward compatibility: users who never touch
+        ``AGENT_MODE`` get agent features automatically once they configure
+        a model, while ``AGENT_MODE=false`` acts as an explicit kill-switch.
+        """
+        # Explicit AGENT_MODE takes full precedence
+        if self._agent_mode_explicit:
+            return self.agent_mode
+        # Auto-detect: if LITELLM_MODEL is set, agent is implicitly available
+        if self.litellm_model:
+            return True
+        return False
 
     def refresh_stock_list(self) -> None:
         """

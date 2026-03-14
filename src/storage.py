@@ -36,6 +36,7 @@ from sqlalchemy import (
     Text,
     select,
     and_,
+    or_,
     delete,
     desc,
     func,
@@ -1478,9 +1479,32 @@ class DatabaseManager:
             # 倒序返回，保证时间顺序
             return [{"role": msg.role, "content": msg.content} for msg in reversed(messages)]
 
-    def get_chat_sessions(self, limit: int = 50) -> List[Dict[str, Any]]:
+    def conversation_session_exists(self, session_id: str) -> bool:
+        """Return True when at least one message exists for the given session."""
+        with self.session_scope() as session:
+            stmt = (
+                select(ConversationMessage.id)
+                .where(ConversationMessage.session_id == session_id)
+                .limit(1)
+            )
+            return session.execute(stmt).scalar() is not None
+
+    def get_chat_sessions(
+        self,
+        limit: int = 50,
+        session_prefix: Optional[str] = None,
+        extra_session_ids: Optional[List[str]] = None,
+    ) -> List[Dict[str, Any]]:
         """
         获取聊天会话列表（从 conversation_messages 聚合）
+
+        Args:
+            limit: Maximum number of sessions to return.
+            session_prefix: If provided, only return sessions whose session_id
+                starts with this prefix.  Used for per-user isolation (e.g.
+                ``"telegram_12345"``).
+            extra_session_ids: Optional exact session ids to include in
+                addition to the scoped prefix.
 
         Returns:
             按最近活跃时间倒序的会话列表，每条包含 session_id, title, message_count, last_active
@@ -1488,14 +1512,29 @@ class DatabaseManager:
         from sqlalchemy import func
 
         with self.session_scope() as session:
+            normalized_prefix = None
+            if session_prefix:
+                normalized_prefix = session_prefix if session_prefix.endswith(":") else f"{session_prefix}:"
+            exact_ids = [sid for sid in (extra_session_ids or []) if sid]
+
             # 聚合每个 session 的消息数和最后活跃时间
-            stmt = (
+            base = (
                 select(
                     ConversationMessage.session_id,
                     func.count(ConversationMessage.id).label("message_count"),
                     func.min(ConversationMessage.created_at).label("created_at"),
                     func.max(ConversationMessage.created_at).label("last_active"),
                 )
+            )
+            conditions = []
+            if normalized_prefix:
+                conditions.append(ConversationMessage.session_id.startswith(normalized_prefix))
+            if exact_ids:
+                conditions.append(ConversationMessage.session_id.in_(exact_ids))
+            if conditions:
+                base = base.where(or_(*conditions))
+            stmt = (
+                base
                 .group_by(ConversationMessage.session_id)
                 .order_by(desc(func.max(ConversationMessage.created_at)))
                 .limit(limit)

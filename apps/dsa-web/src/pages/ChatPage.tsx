@@ -153,7 +153,7 @@ const ChatPage: React.FC = () => {
       const payload = {
         message: msgText,
         session_id: sessionId,
-        skills: usedStrategy ? [usedStrategy] : undefined,
+        strategies: usedStrategy ? [usedStrategy] : undefined,
         context: followUpContextRef.current ?? undefined,
       };
       followUpContextRef.current = null;

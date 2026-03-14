@@ -212,6 +212,38 @@ class LLMToolAdapter:
         Returns:
             LLMResponse with either content (final answer) or tool_calls.
         """
+        return self.call_completion(messages, tools=tools, provider=provider)
+
+    def call_text(
+        self,
+        messages: List[Dict[str, Any]],
+        *,
+        provider: Optional[str] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        timeout: Optional[float] = None,
+    ) -> LLMResponse:
+        """Send a text-only completion through the shared routing stack."""
+        return self.call_completion(
+            messages,
+            tools=None,
+            provider=provider,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            timeout=timeout,
+        )
+
+    def call_completion(
+        self,
+        messages: List[Dict[str, Any]],
+        *,
+        tools: Optional[List[dict]] = None,
+        provider: Optional[str] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        timeout: Optional[float] = None,
+    ) -> LLMResponse:
+        """Shared completion path for both tool and text-only calls."""
         config = self._config
         models_to_try = [config.litellm_model] + (config.litellm_fallback_models or [])
         models_to_try = [m for m in models_to_try if m]
@@ -219,7 +251,14 @@ class LLMToolAdapter:
         last_error = None
         for model in models_to_try:
             try:
-                return self._call_litellm_model(messages, tools, model)
+                return self._call_litellm_model(
+                    messages,
+                    tools or [],
+                    model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    timeout=timeout,
+                )
             except Exception as e:
                 logger.warning(f"Agent LLM call failed with {model}: {e}")
                 last_error = e
@@ -234,6 +273,10 @@ class LLMToolAdapter:
         messages: List[Dict[str, Any]],
         tools: List[dict],
         model: str,
+        *,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        timeout: Optional[float] = None,
     ) -> LLMResponse:
         """Call a specific litellm model with OpenAI-format messages and tools."""
         openai_messages = self._convert_messages(messages)
@@ -244,8 +287,12 @@ class LLMToolAdapter:
         call_kwargs: Dict[str, Any] = {
             "model": model,
             "messages": openai_messages,
-            "temperature": self._get_temperature(model),
+            "temperature": self._get_temperature(model) if temperature is None else temperature,
         }
+        if max_tokens is not None:
+            call_kwargs["max_tokens"] = max_tokens
+        if timeout is not None:
+            call_kwargs["timeout"] = timeout
 
         extra = get_thinking_extra_body(model_short)
         if extra:

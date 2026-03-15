@@ -11,17 +11,38 @@ Tools:
 
 import logging
 from datetime import date
+from threading import Lock
 from typing import Optional
 
 from src.agent.tools.registry import ToolParameter, ToolDefinition
 
 logger = logging.getLogger(__name__)
 
+_fetcher_manager_singleton = None
+_fetcher_manager_lock = Lock()
+
 
 def _get_fetcher_manager():
-    """Lazy import to avoid circular deps."""
+    """Return a module-level singleton DataFetcherManager.
+
+    Re-creating the manager on every tool call causes Tushare re-init overhead
+    (~2 s each) and prevents circuit-breaker cooldown from taking effect across
+    consecutive tool calls within the same agent run.
+    """
     from data_provider import DataFetcherManager
-    return DataFetcherManager()
+    global _fetcher_manager_singleton
+    if _fetcher_manager_singleton is None:
+        with _fetcher_manager_lock:
+            if _fetcher_manager_singleton is None:
+                _fetcher_manager_singleton = DataFetcherManager()
+    return _fetcher_manager_singleton
+
+
+def reset_fetcher_manager() -> None:
+    """Clear the cached DataFetcherManager so runtime config reloads take effect."""
+    global _fetcher_manager_singleton
+    with _fetcher_manager_lock:
+        _fetcher_manager_singleton = None
 
 
 def _get_db():
@@ -161,7 +182,11 @@ def _handle_get_realtime_quote(stock_code: str) -> dict:
     manager = _get_fetcher_manager()
     quote = manager.get_realtime_quote(stock_code)
     if quote is None:
-        return {"error": f"No realtime quote available for {stock_code}"}
+        return {
+            "error": f"No realtime quote available for {stock_code}",
+            "retriable": False,
+            "note": "All data sources unavailable (network or circuit-breaker). Skip this tool and proceed with historical data only.",
+        }
 
     return {
         "code": quote.code,

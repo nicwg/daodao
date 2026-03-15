@@ -1,12 +1,14 @@
 import type React from 'react';
 import { useEffect } from 'react';
 import {BrowserRouter as Router, Routes, Route, NavLink, useLocation, Navigate} from 'react-router-dom';
+import { RiExchangeFundsLine } from '@remixicon/react';
 import HomePage from './pages/HomePage';
 import BacktestPage from './pages/BacktestPage';
 import SettingsPage from './pages/SettingsPage';
 import LoginPage from './pages/LoginPage';
 import NotFoundPage from './pages/NotFoundPage';
 import ChatPage from './pages/ChatPage';
+import PortfolioPage from './pages/PortfolioPage';
 import { ApiErrorAlert } from './components/common';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useAgentChatStore } from './stores/agentChatStore';
@@ -25,6 +27,10 @@ const BacktestIcon: React.FC<{ active?: boolean }> = ({active}) => (
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? 2 : 1.5}
               d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
     </svg>
+);
+
+const PortfolioIcon: React.FC<{ active?: boolean }> = ({active}) => (
+    <RiExchangeFundsLine className="w-6 h-6" size={active ? 25 : 24} />
 );
 
 const SettingsIcon: React.FC<{ active?: boolean }> = ({active}) => (
@@ -68,6 +74,12 @@ const NAV_ITEMS: DockItem[] = [
         label: '问股',
         to: '/chat',
         icon: ChatIcon,
+    },
+    {
+        key: 'portfolio',
+        label: '持仓',
+        to: '/portfolio',
+        icon: PortfolioIcon,
     },
     {
         key: 'backtest',
@@ -206,6 +218,7 @@ const AppContent: React.FC = () => {
                 <Routes>
                     <Route path="/" element={<HomePage/>}/>
                     <Route path="/chat" element={<ChatPage/>}/>
+                    <Route path="/portfolio" element={<PortfolioPage/>}/>
                     <Route path="/backtest" element={<BacktestPage/>}/>
                     <Route path="/settings" element={<SettingsPage/>}/>
                     <Route path="/login" element={<LoginPage/>}/>

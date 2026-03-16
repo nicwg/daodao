@@ -228,6 +228,7 @@ daily_stock_analysis/
 | `BRAVE_API_KEYS` | Brave Search API Key（美股优化） | 可选 |
 | `SERPAPI_API_KEYS` | SerpAPI 备用搜索 | 可选 |
 | `SEARXNG_BASE_URLS` | SearXNG 自建实例（无配额兜底，需在 settings.yml 启用 format: json） | 可选 |
+| `NEWS_STRATEGY_PROFILE` | 新闻策略窗口档位：`ultra_short`(1天)/`short`(3天)/`medium`(7天)/`long`(30天)；实际窗口取与 `NEWS_MAX_AGE_DAYS` 的最小值 | 默认 `short` |
 | `NEWS_MAX_AGE_DAYS` | 新闻最大时效（天），搜索时限制结果在近期内 | 默认 `3` |
 | `BIAS_THRESHOLD` | 乖离率阈值（%），超过提示不追高；强势趋势股自动放宽到 1.5 倍 | 默认 `5.0` |
 
@@ -889,6 +890,7 @@ python main.py --serve-only --host 0.0.0.0 --port 8888
 ### 注意事项
 
 - 浏览器访问：`http://127.0.0.1:8000`（或您配置的端口）
+- 在云服务器上部署后，不知道浏览器该输入什么地址？请看 [云服务器 Web 界面访问指南](deploy-webui-cloud.md)
 - 分析完成后自动推送通知到配置的渠道
 - 此功能在 GitHub Actions 环境中会自动禁用
 - 另见 [openclaw Skill 集成指南](openclaw-skill-integration.md)

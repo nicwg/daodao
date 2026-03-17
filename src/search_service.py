@@ -1776,11 +1776,16 @@ class SearchService:
             query = f"{stock_name} {stock_code} 股票 最新消息"
 
         logger.info(
-            "搜索股票新闻: %s(%s), query='%s', 时间范围: 近%s天, 目标条数=%s, provider请求条数=%s",
+            (
+                "搜索股票新闻: %s(%s), query='%s', 时间范围: 近%s天 "
+                "(profile=%s, NEWS_MAX_AGE_DAYS=%s), 目标条数=%s, provider请求条数=%s"
+            ),
             stock_name,
             stock_code,
             query,
             search_days,
+            self.news_strategy_profile,
+            self.news_max_age_days,
             max_results,
             provider_max_results,
         )
@@ -1959,10 +1964,15 @@ class SearchService:
         provider_max_results = self._provider_request_size(target_per_dimension)
 
         logger.info(
-            "开始多维度情报搜索: %s(%s), 时间范围: 近%s天, 目标条数=%s, provider请求条数=%s",
+            (
+                "开始多维度情报搜索: %s(%s), 时间范围: 近%s天 "
+                "(profile=%s, NEWS_MAX_AGE_DAYS=%s), 目标条数=%s, provider请求条数=%s"
+            ),
             stock_name,
             stock_code,
             search_days,
+            self.news_strategy_profile,
+            self.news_max_age_days,
             target_per_dimension,
             provider_max_results,
         )

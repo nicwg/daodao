@@ -43,6 +43,12 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         os.environ.pop("ENV_FILE", None)
         self.temp_dir.cleanup()
 
+    def _rewrite_env(self, *lines: str) -> None:
+        self.env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        Config.reset_instance()
+        self.manager = ConfigManager(env_path=self.env_path)
+        self.service = SystemConfigService(manager=self.manager)
+
     def test_get_config_returns_raw_sensitive_values(self) -> None:
         payload = self.service.get_config(include_schema=True)
         items = {item["key"]: item for item in payload["items"]}
@@ -225,6 +231,52 @@ class SystemConfigServiceTestCase(unittest.TestCase):
 
         self.assertTrue(validation["valid"])
         self.assertEqual(validation["issues"], [])
+
+    def test_validate_accepts_legacy_agent_orchestrator_mode_alias(self) -> None:
+        validation = self.service.validate(items=[{"key": "AGENT_ORCHESTRATOR_MODE", "value": "strategy"}])
+
+        self.assertTrue(validation["valid"])
+        self.assertEqual(validation["issues"], [])
+
+    def test_get_config_projects_legacy_strategy_aliases_onto_skill_fields(self) -> None:
+        self._rewrite_env(
+            "AGENT_STRATEGY_DIR=legacy-strategies",
+            "AGENT_STRATEGY_AUTOWEIGHT=false",
+            "AGENT_STRATEGY_ROUTING=manual",
+        )
+
+        payload = self.service.get_config(include_schema=True)
+        items = {item["key"]: item for item in payload["items"]}
+
+        self.assertEqual(items["AGENT_SKILL_DIR"]["value"], "legacy-strategies")
+        self.assertEqual(items["AGENT_SKILL_AUTOWEIGHT"]["value"], "false")
+        self.assertEqual(items["AGENT_SKILL_ROUTING"]["value"], "manual")
+        self.assertNotIn("AGENT_STRATEGY_DIR", items)
+        self.assertNotIn("AGENT_STRATEGY_AUTOWEIGHT", items)
+        self.assertNotIn("AGENT_STRATEGY_ROUTING", items)
+
+    def test_get_config_respects_empty_canonical_skill_field_over_legacy_alias(self) -> None:
+        self._rewrite_env(
+            "AGENT_SKILL_DIR=",
+            "AGENT_STRATEGY_DIR=legacy-strategies",
+        )
+
+        payload = self.service.get_config(include_schema=True)
+        items = {item["key"]: item for item in payload["items"]}
+
+        self.assertEqual(items["AGENT_SKILL_DIR"]["value"], "")
+
+    def test_get_config_normalizes_legacy_orchestrator_mode_for_ui(self) -> None:
+        self._rewrite_env("AGENT_ORCHESTRATOR_MODE=strategy")
+
+        payload = self.service.get_config(include_schema=True)
+        items = {item["key"]: item for item in payload["items"]}
+
+        self.assertEqual(items["AGENT_ORCHESTRATOR_MODE"]["value"], "specialist")
+        self.assertEqual(
+            items["AGENT_ORCHESTRATOR_MODE"]["schema"]["validation"]["enum"],
+            ["quick", "standard", "full", "specialist", "strategy", "skill"],
+        )
 
     @patch.object(
         Config,

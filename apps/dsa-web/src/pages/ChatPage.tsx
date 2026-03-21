@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm';
 import { agentApi } from '../api/agent';
 import { ApiErrorAlert, Button, ConfirmDialog, ScrollArea } from '../components/common';
 import { getParsedApiError } from '../api/error';
-import type { StrategyInfo } from '../api/agent';
+import type { SkillInfo } from '../api/agent';
 import {
   useAgentChatStore,
   type Message,
@@ -18,20 +18,20 @@ import { isNearBottom } from '../utils/chatScroll';
 
 // Quick question examples shown on empty state
 const QUICK_QUESTIONS = [
-  { label: '用缠论分析茅台', strategy: 'chan_theory' },
-  { label: '波浪理论看宁德时代', strategy: 'wave_theory' },
-  { label: '分析比亚迪趋势', strategy: 'bull_trend' },
-  { label: '箱体震荡策略看中芯国际', strategy: 'box_oscillation' },
-  { label: '分析腾讯 hk00700', strategy: 'bull_trend' },
-  { label: '用情绪周期分析东方财富', strategy: 'emotion_cycle' },
+  { label: '用缠论分析茅台', skill: 'chan_theory' },
+  { label: '波浪理论看宁德时代', skill: 'wave_theory' },
+  { label: '分析比亚迪趋势', skill: 'bull_trend' },
+  { label: '箱体震荡技能看中芯国际', skill: 'box_oscillation' },
+  { label: '分析腾讯 hk00700', skill: 'bull_trend' },
+  { label: '用情绪周期分析东方财富', skill: 'emotion_cycle' },
 ];
 
 const ChatPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [input, setInput] = useState('');
-  const [strategies, setStrategies] = useState<StrategyInfo[]>([]);
-  const [selectedStrategy, setSelectedStrategy] = useState<string>('bull_trend');
-  const [showStrategyDesc, setShowStrategyDesc] = useState<string | null>(null);
+  const [skills, setSkills] = useState<SkillInfo[]>([]);
+  const [selectedSkill, setSelectedSkill] = useState<string>('');
+  const [showSkillDesc, setShowSkillDesc] = useState<string | null>(null);
   const [expandedThinking, setExpandedThinking] = useState<Set<string>>(new Set());
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -51,7 +51,7 @@ const ChatPage: React.FC = () => {
 
   // Set page title
   useEffect(() => {
-    document.title = '策略问股 - DSA';
+    document.title = '问股 - DSA';
   }, []);
 
   useEffect(() => () => {
@@ -128,15 +128,18 @@ const ChatPage: React.FC = () => {
   }, [loadInitialSession]);
 
   useEffect(() => {
-    agentApi.getStrategies().then((res) => {
-      setStrategies(res.strategies);
+    agentApi.getSkills().then((res) => {
+      setSkills(res.skills);
       const defaultId =
-        res.strategies.find((s) => s.id === 'bull_trend')?.id ||
-        res.strategies[0]?.id ||
+        res.default_skill_id ||
+        res.skills[0]?.id ||
         '';
-      setSelectedStrategy(defaultId);
+      setSelectedSkill(defaultId);
     }).catch(() => {});
   }, []);
+
+  const availableSkillIds = new Set(skills.map((skill) => skill.id));
+  const quickQuestions = QUICK_QUESTIONS.filter((question) => availableSkillIds.size === 0 || availableSkillIds.has(question.skill));
 
   const handleStartNewChat = useCallback(() => {
     followUpContextRef.current = null;
@@ -198,18 +201,18 @@ const ChatPage: React.FC = () => {
   }, [searchParams, setSearchParams]);
 
   const handleSend = useCallback(
-    async (overrideMessage?: string, overrideStrategy?: string) => {
+    async (overrideMessage?: string, overrideSkill?: string) => {
       const msgText = overrideMessage || input.trim();
       if (!msgText || loading) return;
-      const usedStrategy = overrideStrategy || selectedStrategy;
-      const usedStrategyName =
-        strategies.find((s) => s.id === usedStrategy)?.name ||
-        (usedStrategy ? usedStrategy : '通用');
+      const usedSkill = overrideSkill || selectedSkill;
+      const usedSkillName =
+        skills.find((s) => s.id === usedSkill)?.name ||
+        (usedSkill ? usedSkill : '通用');
 
       const payload = {
         message: msgText,
         session_id: sessionId,
-        strategies: usedStrategy ? [usedStrategy] : undefined,
+        skills: usedSkill ? [usedSkill] : undefined,
         context: followUpContextRef.current ?? undefined,
       };
       followUpHydrationTokenRef.current += 1;
@@ -218,9 +221,9 @@ const ChatPage: React.FC = () => {
 
       setInput('');
       requestScrollToBottom('smooth');
-      await startStream(payload, { strategyName: usedStrategyName });
+      await startStream(payload, { skillName: usedSkillName });
     },
-    [input, loading, requestScrollToBottom, selectedStrategy, strategies, sessionId, startStream],
+    [input, loading, requestScrollToBottom, selectedSkill, skills, sessionId, startStream],
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -231,8 +234,8 @@ const ChatPage: React.FC = () => {
   };
 
   const handleQuickQuestion = (q: (typeof QUICK_QUESTIONS)[0]) => {
-    setSelectedStrategy(q.strategy);
-    handleSend(q.label, q.strategy);
+    setSelectedSkill(q.skill);
+    handleSend(q.label, q.skill);
   };
 
   const toggleThinking = (msgId: string) => {
@@ -524,7 +527,7 @@ const ChatPage: React.FC = () => {
             问股
           </h1>
           <p className="text-secondary-text text-sm">
-            向 AI 询问个股分析，获取基于策略的交易建议与实时决策报告。
+            向 AI 询问个股分析，获取基于技能视角的交易建议与实时决策报告。
           </p>
           {messages.length > 0 && (
             <div className="mt-2 flex gap-2 items-center">
@@ -657,7 +660,7 @@ const ChatPage: React.FC = () => {
                   将调用实时数据工具为您生成决策报告。
                 </p>
                 <div className="flex flex-wrap gap-2 justify-center max-w-lg">
-                  {QUICK_QUESTIONS.map((q, i) => (
+                  {quickQuestions.map((q, i) => (
                     <button
                       key={i}
                       onClick={() => handleQuickQuestion(q)}
@@ -690,7 +693,7 @@ const ChatPage: React.FC = () => {
                         : 'bg-card/72 text-secondary-text border border-white/30 rounded-tl-sm'
                     }`}
                   >
-                    {msg.role === 'assistant' && msg.strategyName && (
+                    {msg.role === 'assistant' && msg.skillName && (
                       <div className="mb-2">
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan/10 border border-cyan/20 text-xs text-cyan">
                           <svg
@@ -706,7 +709,7 @@ const ChatPage: React.FC = () => {
                               d="M13 10V3L4 14h7v7l9-11h-7z"
                             />
                           </svg>
-                          {msg.strategyName}
+                          {msg.skillName}
                         </span>
                       </div>
                     )}
@@ -783,7 +786,7 @@ const ChatPage: React.FC = () => {
             {chatError ? (
               <ApiErrorAlert error={chatError} className="mb-3" />
             ) : null}
-            {strategies.length > 0 && (
+            {skills.length > 0 && (
               <div className="mb-3 flex flex-wrap gap-x-5 gap-y-2 items-start">
                 <span className="text-xs text-muted-text font-medium uppercase tracking-wider flex-shrink-0 mt-1">
                   策略
@@ -791,39 +794,39 @@ const ChatPage: React.FC = () => {
                 <label className="flex items-center gap-1.5 text-sm cursor-pointer group mt-0.5">
                   <input
                     type="radio"
-                    name="strategy"
+                    name="skill"
                     value=""
-                    checked={selectedStrategy === ''}
-                    onChange={() => setSelectedStrategy('')}
+                    checked={selectedSkill === ''}
+                    onChange={() => setSelectedSkill('')}
                     className="w-3.5 h-3.5 accent-cyan"
                   />
                   <span
-                    className={`transition-colors text-sm ${selectedStrategy === '' ? 'text-foreground font-medium' : 'text-secondary-text group-hover:text-foreground'}`}
+                    className={`transition-colors text-sm ${selectedSkill === '' ? 'text-foreground font-medium' : 'text-secondary-text group-hover:text-foreground'}`}
                   >
                     通用分析
                   </span>
                 </label>
-                {strategies.map((s) => (
+                {skills.map((s) => (
                   <label
                     key={s.id}
                     className="flex items-center gap-1.5 cursor-pointer group relative mt-0.5"
-                    onMouseEnter={() => setShowStrategyDesc(s.id)}
-                    onMouseLeave={() => setShowStrategyDesc(null)}
+                    onMouseEnter={() => setShowSkillDesc(s.id)}
+                    onMouseLeave={() => setShowSkillDesc(null)}
                   >
                     <input
                       type="radio"
-                      name="strategy"
+                      name="skill"
                       value={s.id}
-                      checked={selectedStrategy === s.id}
-                      onChange={() => setSelectedStrategy(s.id)}
+                      checked={selectedSkill === s.id}
+                      onChange={() => setSelectedSkill(s.id)}
                       className="w-3.5 h-3.5 accent-cyan"
                     />
                     <span
-                      className={`transition-colors text-sm ${selectedStrategy === s.id ? 'text-foreground font-medium' : 'text-secondary-text group-hover:text-foreground'}`}
+                      className={`transition-colors text-sm ${selectedSkill === s.id ? 'text-foreground font-medium' : 'text-secondary-text group-hover:text-foreground'}`}
                     >
                       {s.name}
                     </span>
-                    {showStrategyDesc === s.id && s.description && (
+                    {showSkillDesc === s.id && s.description && (
                       <div className="absolute left-0 bottom-full mb-2 z-50 w-64 p-2.5 rounded-lg bg-elevated border border-border/70 shadow-xl text-xs text-secondary-text leading-relaxed pointer-events-none animate-fade-in">
                         <p className="font-medium text-foreground mb-1">{s.name}</p>
                         <p>{s.description}</p>

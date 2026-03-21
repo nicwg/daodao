@@ -16,7 +16,7 @@
 
 **AI-powered stock analysis system for A-shares / Hong Kong / US stocks**
 
-Analyze your watchlist daily → generate a decision dashboard → push to multiple channels (Telegram/Discord/Email/WeChat Work/Feishu)
+Analyze your watchlist daily → generate a decision dashboard → push to multiple channels (Telegram/Discord/Slack/Email/WeChat Work/Feishu)
 
 **Zero-cost deployment** · Runs on GitHub Actions · No server required
 
@@ -44,8 +44,8 @@ English | [简体中文](../README.md) | [繁體中文](README_CHT.md)
 | Market | Global Markets | A-shares, Hong Kong stocks, US stocks |
 | Review | Market Review | Daily overview, sectors, northbound capital flow |
 | Backtest | AI Backtest Validation | Auto-evaluate historical analysis accuracy, direction win rate, SL/TP hit rates |
-| Agent Q&A | Strategy Chat | Multi-turn strategy chat with 11 built-in skills (Web/Bot/API) |
-| Notifications | Multi-channel Push | Telegram, Discord, Email, WeChat Work, Feishu, etc. |
+| Agent Q&A | Strategy Chat | Multi-turn strategy chat with 11 built-in trading strategies (internally loaded as skills) (Web/Bot/API) |
+| Notifications | Multi-channel Push | Telegram, Discord, Slack, Email, WeChat Work, Feishu, etc. |
 | Automation | Scheduled Runs | GitHub Actions scheduled execution, no server required |
 
 ### Tech Stack & Data Sources
@@ -104,6 +104,9 @@ Go to your forked repo → `Settings` → `Secrets and variables` → `Actions` 
 | `DISCORD_WEBHOOK_URL` | Discord Webhook URL | Optional |
 | `DISCORD_BOT_TOKEN` | Discord Bot Token (choose one with Webhook) | Optional |
 | `DISCORD_MAIN_CHANNEL_ID` | Discord Channel ID (required when using Bot) | Optional |
+| `SLACK_BOT_TOKEN` | Slack Bot Token (recommended, supports image upload; takes priority over Webhook when both set) | Optional |
+| `SLACK_CHANNEL_ID` | Slack Channel ID (required when using Bot) | Optional |
+| `SLACK_WEBHOOK_URL` | Slack Incoming Webhook URL (text only, no image support) | Optional |
 | `EMAIL_SENDER` | Sender email (e.g., `xxx@qq.com`) | Optional |
 | `EMAIL_PASSWORD` | Email authorization code (not login password) | Optional |
 | `EMAIL_RECEIVERS` | Receiver emails (comma-separated, leave empty to send to yourself) | Optional |
@@ -137,10 +140,11 @@ Go to your forked repo → `Settings` → `Secrets and variables` → `Actions` 
 | `TUSHARE_TOKEN` | [Tushare Pro](https://tushare.pro/weborder/#/login?reg=834638 ) Token | Optional |
 | `TICKFLOW_API_KEY` | [TickFlow](https://tickflow.org) API key (CN market review index enhancement; breadth also uses TickFlow when the plan supports universe queries) | Optional |
 | `WECHAT_MSG_TYPE` | WeChat Work message type, default `markdown`, set to `text` for plain markdown text | Optional |
-| `AGENT_MODE` | Enable Agent strategy chat mode (`true`/`false`, default `false`) | Optional |
+| `AGENT_MODE` | Enable Agent strategy chat mode (internally normalized as `skill`, `true`/`false`, default `false`) | Optional |
 | `AGENT_LITELLM_MODEL` | Optional Agent-only primary model; when empty it inherits `LITELLM_MODEL`, and bare names are normalized to `openai/<model>` | Optional |
 | `AGENT_MAX_STEPS` | Max reasoning steps for Agent mode (default `10`) | Optional |
-| `AGENT_STRATEGY_DIR` | Custom strategy directory (default built-in `strategies/`) | Optional |
+| `AGENT_SKILLS` | Comma-separated active strategy-skill ids. Leave empty to use the primary default strategy skill declared in metadata (built-in default: `bull_trend`); use `all` to activate every loaded strategy skill. | Optional |
+| `AGENT_SKILL_DIR` | Custom strategy-skill directory (default built-in `strategies/` compatibility path) | Optional |
 
 **Stock Code Format**
 
@@ -269,7 +273,20 @@ DISCORD_BOT_TOKEN=your_bot_token
 DISCORD_MAIN_CHANNEL_ID=your_channel_id
 ```
 
-### 3. Email
+### 3. Slack
+
+Bot (recommended, supports image upload; takes priority when both set):
+```bash
+SLACK_BOT_TOKEN=xoxb-...
+SLACK_CHANNEL_ID=C01234567
+```
+
+Webhook (text only):
+```bash
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/T.../B.../xxx
+```
+
+### 4. Email
 
 ```bash
 EMAIL_SENDER=your_email@gmail.com
@@ -277,7 +294,7 @@ EMAIL_PASSWORD=your_app_password
 EMAIL_RECEIVERS=receiver@example.com  # Optional
 ```
 
-### 4. WeChat Work / Feishu
+### 5. WeChat Work / Feishu
 
 WeChat Work:
 ```bash
@@ -289,7 +306,7 @@ Feishu:
 FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxx
 ```
 
-### 5. PushPlus
+### 6. PushPlus
 
 ```bash
 PUSHPLUS_TOKEN=your_token_here
@@ -436,7 +453,7 @@ Enable the FastAPI service for configuration management and triggering analysis 
 | `/api/v1/backtest/results` | GET | Query backtest results (paginated) |
 | `/api/v1/backtest/performance` | GET | Get overall backtest performance |
 | `/api/v1/backtest/performance/{code}` | GET | Get per-stock backtest performance |
-| `/api/v1/agent/strategies` | GET | Get available built-in/custom strategies |
+| `/api/v1/agent/skills` | GET | Get available built-in/custom strategy skills |
 | `/api/v1/agent/chat/stream` | POST (SSE) | Stream multi-turn Agent strategy chat |
 | `/api/health` | GET | Health check |
 

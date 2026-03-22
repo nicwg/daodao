@@ -23,6 +23,7 @@ from src.agent.llm_adapter import LLMToolAdapter
 from src.agent.runner import run_agent_loop, parse_dashboard_json
 from src.agent.tools.registry import ToolRegistry
 from src.report_language import normalize_report_language
+from src.market_context import get_market_role, get_market_guidelines
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +50,9 @@ class AgentResult:
 # System prompt builder
 # ============================================================
 
-AGENT_SYSTEM_PROMPT = """你是一位专注于趋势交易的 A 股投资分析 Agent，拥有数据工具和交易技能，负责生成专业的【决策仪表盘】分析报告。
+AGENT_SYSTEM_PROMPT = """你是一位专注于趋势交易的{market_role}投资分析 Agent，拥有数据工具和交易技能，负责生成专业的【决策仪表盘】分析报告。
+
+{market_guidelines}
 
 ## 工作流程（必须严格按阶段顺序执行，每阶段等工具结果返回后再进入下一阶段）
 
@@ -178,7 +181,9 @@ AGENT_SYSTEM_PROMPT = """你是一位专注于趋势交易的 A 股投资分析 
 {language_section}
 """
 
-CHAT_SYSTEM_PROMPT = """你是一位专注于趋势交易的 A 股投资分析 Agent，拥有数据工具和交易技能，负责解答用户的股票投资问题。
+CHAT_SYSTEM_PROMPT = """你是一位专注于趋势交易的{market_role}投资分析 Agent，拥有数据工具和交易技能，负责解答用户的股票投资问题。
+
+{market_guidelines}
 
 ## 分析工作流程（必须严格按阶段执行，禁止跳步或合并阶段）
 
@@ -298,7 +303,12 @@ class AgentExecutor:
         if self.default_skill_policy:
             default_skill_policy_section = f"\n{self.default_skill_policy}\n"
         report_language = normalize_report_language((context or {}).get("report_language", "zh"))
+        stock_code = (context or {}).get("stock_code", "")
+        market_role = get_market_role(stock_code, report_language)
+        market_guidelines = get_market_guidelines(stock_code, report_language)
         system_prompt = AGENT_SYSTEM_PROMPT.format(
+            market_role=market_role,
+            market_guidelines=market_guidelines,
             default_skill_policy_section=default_skill_policy_section,
             skills_section=skills_section,
             language_section=_build_language_section(report_language),
@@ -337,7 +347,12 @@ class AgentExecutor:
         if self.default_skill_policy:
             default_skill_policy_section = f"\n{self.default_skill_policy}\n"
         report_language = normalize_report_language((context or {}).get("report_language", "zh"))
+        stock_code = (context or {}).get("stock_code", "")
+        market_role = get_market_role(stock_code, report_language)
+        market_guidelines = get_market_guidelines(stock_code, report_language)
         system_prompt = CHAT_SYSTEM_PROMPT.format(
+            market_role=market_role,
+            market_guidelines=market_guidelines,
             default_skill_policy_section=default_skill_policy_section,
             skills_section=skills_section,
             language_section=_build_language_section(report_language, chat_mode=True),

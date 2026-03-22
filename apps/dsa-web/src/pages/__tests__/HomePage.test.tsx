@@ -175,4 +175,99 @@ describe('HomePage', () => {
       '/chat?stock=600519&name=%E8%B4%B5%E5%B7%9E%E8%8C%85%E5%8F%B0&recordId=1',
     );
   });
+
+  it('confirms and deletes selected history from the dashboard state flow', async () => {
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 1,
+      page: 1,
+      limit: 20,
+      items: [historyItem],
+    });
+    vi.mocked(historyApi.getDetail).mockResolvedValue(historyReport);
+    vi.mocked(historyApi.deleteRecords).mockResolvedValue({ deleted: 1 });
+
+    useStockPoolStore.setState({
+      historyItems: [historyItem],
+      selectedHistoryIds: [1],
+      selectedReport: historyReport,
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: '删除' }));
+
+    expect(
+      await screen.findByText('确认删除这条历史记录吗？删除后将不可恢复。'),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '确认删除' }));
+
+    await waitFor(() => {
+      expect(historyApi.deleteRecords).toHaveBeenCalledWith([1]);
+    });
+  });
+
+  it('opens and closes the mobile history drawer without changing dashboard styles', async () => {
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+
+    const { container } = render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    const trigger = await screen.findByTitle('历史记录');
+    fireEvent.click(trigger);
+
+    expect(container.querySelector('.home-mobile-overlay')).toBeTruthy();
+    expect(container.querySelector('.dashboard-card')).toBeTruthy();
+
+    fireEvent.click(container.querySelector('.fixed.inset-0.z-40') as HTMLElement);
+
+    await waitFor(() => {
+      expect(container.querySelector('.home-mobile-overlay')).toBeFalsy();
+    });
+  });
+
+  it('renders active task panel content from dashboard state', async () => {
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+
+    useStockPoolStore.setState({
+      activeTasks: [
+        {
+          taskId: 'task-1',
+          stockCode: '600519',
+          stockName: '贵州茅台',
+          status: 'processing',
+          progress: 45,
+          message: '正在抓取最新行情',
+          reportType: 'detailed',
+          createdAt: '2026-03-18T08:00:00Z',
+        },
+      ],
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('分析任务')).toBeInTheDocument();
+    expect(screen.getByText('正在抓取最新行情')).toBeInTheDocument();
+  });
 });

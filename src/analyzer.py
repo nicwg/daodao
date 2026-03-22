@@ -44,6 +44,7 @@ from src.report_language import (
     normalize_report_language,
 )
 from src.schemas.report_schema import AnalysisReportSchema
+from src.market_context import get_market_role, get_market_guidelines
 
 logger = logging.getLogger(__name__)
 
@@ -500,7 +501,9 @@ class GeminiAnalyzer:
     # 核心模块：核心结论 + 数据透视 + 舆情情报 + 作战计划
     # ========================================
 
-    SYSTEM_PROMPT = """你是一位专注于趋势交易的 A 股投资分析师，负责生成专业的【决策仪表盘】分析报告。
+    SYSTEM_PROMPT = """你是一位专注于趋势交易的{market_placeholder}投资分析师，负责生成专业的【决策仪表盘】分析报告。
+
+{guidelines_placeholder}
 
 """ + CORE_TRADING_SKILL_POLICY_ZH + """
 
@@ -659,10 +662,18 @@ class GeminiAnalyzer:
         if not self._litellm_available:
             logger.warning("No LLM configured (LITELLM_MODEL / API keys), AI analysis will be unavailable")
 
-    def _get_analysis_system_prompt(self, report_language: str) -> str:
+    def _get_analysis_system_prompt(self, report_language: str, stock_code: str = "") -> str:
         """Build the analyzer system prompt with output-language guidance."""
-        if normalize_report_language(report_language) == "en":
-            return self.SYSTEM_PROMPT + """
+        lang = normalize_report_language(report_language)
+        market_role = get_market_role(stock_code, lang)
+        market_guidelines = get_market_guidelines(stock_code, lang)
+        base_prompt = self.SYSTEM_PROMPT.replace(
+            "{market_placeholder}", market_role
+        ).replace(
+            "{guidelines_placeholder}", market_guidelines
+        )
+        if lang == "en":
+            return base_prompt + """
 
 ## Output Language (highest priority)
 
@@ -672,7 +683,7 @@ class GeminiAnalyzer:
 - Use the common English company name when you are confident; otherwise keep the original listed company name instead of inventing one.
 - This includes `stock_name`, `trend_prediction`, `operation_advice`, `confidence_level`, nested dashboard text, checklist items, and all narrative summaries.
 """
-        return self.SYSTEM_PROMPT + """
+        return base_prompt + """
 
 ## 输出语言（最高优先级）
 
@@ -898,7 +909,7 @@ class GeminiAnalyzer:
         code = context.get('code', 'Unknown')
         config = get_config()
         report_language = normalize_report_language(getattr(config, "report_language", "zh"))
-        system_prompt = self._get_analysis_system_prompt(report_language)
+        system_prompt = self._get_analysis_system_prompt(report_language, stock_code=code)
         
         # 请求前增加延时（防止连续请求触发限流）
         request_delay = config.gemini_request_delay

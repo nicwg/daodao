@@ -41,6 +41,8 @@ const HomePage: React.FC = () => {
     toggleSelectAllVisible,
     deleteSelectedHistory,
     submitAnalysis,
+    notify,
+    setNotify,
     syncTaskCreated,
     syncTaskUpdated,
     syncTaskFailed,
@@ -174,6 +176,15 @@ const HomePage: React.FC = () => {
                 <p className="absolute -bottom-4 left-0 text-xs text-warning">{duplicateError}</p>
               ) : null}
             </div>
+            <label className="flex flex-shrink-0 cursor-pointer items-center gap-1 text-xs text-secondary-text select-none">
+              <input
+                type="checkbox"
+                checked={notify}
+                onChange={(e) => setNotify(e.target.checked)}
+                className="h-3.5 w-3.5 rounded border-border accent-primary"
+              />
+              推送通知
+            </label>
             <button
               type="button"
               onClick={() => handleSubmitAnalysis()}

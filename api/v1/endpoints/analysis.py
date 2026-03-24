@@ -252,6 +252,7 @@ def _handle_async_analysis_batch(
     stock_name = request.stock_name if is_single else None
     original_query = request.original_query if (is_single or preserve_batch_metadata) else None
     selection_source = request.selection_source if (is_single or preserve_batch_metadata) else None
+    notify = getattr(request, "notify", True)
 
     accepted_tasks, duplicate_errors = task_queue.submit_tasks_batch(
         stock_codes=stock_codes,
@@ -260,7 +261,7 @@ def _handle_async_analysis_batch(
         selection_source=selection_source,
         report_type=request.report_type,
         force_refresh=request.force_refresh,
-        notify=request.notify,
+        notify=notify,
     )
 
     accepted = [
@@ -340,7 +341,7 @@ def _handle_sync_analysis(
             report_type=request.report_type,
             force_refresh=request.force_refresh,
             query_id=query_id,
-            send_notification=request.notify,
+            send_notification=getattr(request, "notify", True),
         )
 
         if result is None:

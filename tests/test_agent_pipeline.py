@@ -100,7 +100,13 @@ class TestAgentFactorySkillBaseline(unittest.TestCase):
     """Ensure explicit skill selection does not silently re-apply the default bull-trend baseline."""
 
     @staticmethod
-    def _make_skill(name: str, *, default_active: bool = False, default_priority: int = 100):
+    def _make_skill(
+        name: str,
+        *,
+        default_active: bool = False,
+        default_priority: int = 100,
+        source: str = "builtin",
+    ):
         return SimpleNamespace(
             name=name,
             display_name=name,
@@ -110,6 +116,7 @@ class TestAgentFactorySkillBaseline(unittest.TestCase):
             default_router=default_active,
             default_priority=default_priority,
             user_invocable=True,
+            source=source,
         )
 
     def _run_factory_case(self, config, *, request_skills, skill_catalog, instructions):
@@ -154,6 +161,7 @@ class TestAgentFactorySkillBaseline(unittest.TestCase):
         )
 
         self.assertEqual(kwargs["default_skill_policy"], "")
+        self.assertFalse(kwargs["use_legacy_default_prompt"])
         skill_manager.activate.assert_called_once_with(["chan_theory"])
 
     def test_configured_skills_disable_default_skill_policy(self):
@@ -174,6 +182,7 @@ class TestAgentFactorySkillBaseline(unittest.TestCase):
         )
 
         self.assertEqual(kwargs["default_skill_policy"], "")
+        self.assertFalse(kwargs["use_legacy_default_prompt"])
         skill_manager.activate.assert_called_once_with(["wave_theory"])
 
     def test_implicit_default_run_keeps_default_skill_policy(self):
@@ -191,6 +200,7 @@ class TestAgentFactorySkillBaseline(unittest.TestCase):
         )
 
         self.assertIn("严进策略", kwargs["default_skill_policy"])
+        self.assertTrue(kwargs["use_legacy_default_prompt"])
         skill_manager.activate.assert_called_once_with(["bull_trend"])
 
     def test_explicit_empty_request_falls_back_to_primary_default_skill(self):
@@ -211,6 +221,95 @@ class TestAgentFactorySkillBaseline(unittest.TestCase):
         )
 
         self.assertIn("严进策略", kwargs["default_skill_policy"])
+        self.assertTrue(kwargs["use_legacy_default_prompt"])
+        skill_manager.activate.assert_called_once_with(["bull_trend"])
+
+    def test_explicit_primary_default_skill_uses_skill_aware_prompt_mode(self):
+        config = SimpleNamespace(
+            agent_arch="single",
+            agent_skills=[],
+            agent_max_steps=10,
+            agent_orchestrator_timeout_s=600,
+        )
+        kwargs, skill_manager = self._run_factory_case(
+            config,
+            request_skills=["bull_trend"],
+            skill_catalog=[
+                self._make_skill("bull_trend", default_active=True, default_priority=10),
+                self._make_skill("chan_theory", default_priority=20),
+            ],
+            instructions="bull_trend instructions",
+        )
+
+        self.assertEqual(kwargs["default_skill_policy"], "")
+        self.assertFalse(kwargs["use_legacy_default_prompt"])
+        skill_manager.activate.assert_called_once_with(["bull_trend"])
+
+    def test_invalid_configured_skills_fall_back_to_primary_default_skill(self):
+        config = SimpleNamespace(
+            agent_arch="single",
+            agent_skills=["missing_skill"],
+            agent_max_steps=10,
+            agent_orchestrator_timeout_s=600,
+        )
+        kwargs, skill_manager = self._run_factory_case(
+            config,
+            request_skills=None,
+            skill_catalog=[
+                self._make_skill("bull_trend", default_active=True, default_priority=10),
+                self._make_skill("chan_theory", default_priority=20),
+            ],
+            instructions="bull_trend instructions",
+        )
+
+        self.assertIn("严进策略", kwargs["default_skill_policy"])
+        self.assertTrue(kwargs["use_legacy_default_prompt"])
+        skill_manager.activate.assert_called_once_with(["bull_trend"])
+
+    def test_custom_default_skill_does_not_use_legacy_bull_prompt(self):
+        config = SimpleNamespace(
+            agent_arch="single",
+            agent_skills=[],
+            agent_max_steps=10,
+            agent_orchestrator_timeout_s=600,
+        )
+        kwargs, skill_manager = self._run_factory_case(
+            config,
+            request_skills=None,
+            skill_catalog=[
+                self._make_skill("custom_default", default_active=True, default_priority=10),
+                self._make_skill("bull_trend", default_priority=20),
+            ],
+            instructions="custom_default instructions",
+        )
+
+        self.assertEqual(kwargs["default_skill_policy"], "")
+        self.assertFalse(kwargs["use_legacy_default_prompt"])
+        skill_manager.activate.assert_called_once_with(["custom_default"])
+
+    def test_custom_bull_trend_override_does_not_use_legacy_prompt(self):
+        config = SimpleNamespace(
+            agent_arch="single",
+            agent_skills=[],
+            agent_max_steps=10,
+            agent_orchestrator_timeout_s=600,
+        )
+        kwargs, skill_manager = self._run_factory_case(
+            config,
+            request_skills=None,
+            skill_catalog=[
+                self._make_skill(
+                    "bull_trend",
+                    default_active=True,
+                    default_priority=10,
+                    source="/tmp/custom-skills/bull_trend.yaml",
+                ),
+            ],
+            instructions="custom bull_trend instructions",
+        )
+
+        self.assertEqual(kwargs["default_skill_policy"], "")
+        self.assertFalse(kwargs["use_legacy_default_prompt"])
         skill_manager.activate.assert_called_once_with(["bull_trend"])
 
 

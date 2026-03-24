@@ -75,7 +75,8 @@ class TestAnalysisIntegration:
             original_query="贵州茅台",
             selection_source="manual",
             report_type="detailed",
-            force_refresh=False
+            force_refresh=False,
+            notify=True,
         )
 
     def test_trigger_analysis_batch_deduplication(self, client, mock_task_queue):

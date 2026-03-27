@@ -277,7 +277,7 @@ def generate_data_documentation(
 
     content = f"""# Tushare 股票列表数据说明
 
-> 数据来源：[Tushare Pro](https://tushare.pro)
+> 数据来源：[Tushare Pro](http://47.109.97.125:8080/tushare)
 > 生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
 ## 文件说明

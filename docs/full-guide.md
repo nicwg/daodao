@@ -306,6 +306,7 @@ daily_stock_analysis/
 
 Dockerfile 使用多阶段构建，前端会在构建镜像时自动打包并内置到 `static/`。
 如需覆盖静态资源，可挂载本地 `static/` 到容器内 `/app/static`。
+运行中的 `server` 容器默认直接复用 `/app/static` 里的预构建产物，不要求容器内保留 `apps/dsa-web` 源码目录或运行时安装 `npm`；若 WebUI 无法打开，请优先确认 `/app/static/index.html` 是否存在。
 
 ### 快速启动
 

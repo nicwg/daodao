@@ -284,6 +284,8 @@ Default schedule: Every weekday at **18:00 (Beijing Time)** automatic execution.
 
 ## Docker Deployment
 
+The image uses prebuilt frontend assets under `/app/static` at runtime, so the running `server` container does not require the `apps/dsa-web` source tree or runtime `npm`. If WebUI cannot be opened after Docker deployment, first verify that `/app/static/index.html` exists inside the container.
+
 ### Quick Start
 
 ```bash

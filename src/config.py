@@ -247,6 +247,7 @@ def normalize_llm_channel_model(model: str, protocol: Optional[str], base_url: O
         prefix = raw_prefix.lower()
         canonical_prefix = canonicalize_llm_channel_protocol(prefix)
         known_providers = _MANAGED_LITELLM_KEY_PROVIDERS | set(SUPPORTED_LLM_CHANNEL_PROTOCOLS) | {
+            "minimax",
             "cohere", "huggingface", "bedrock", "sagemaker", "azure",
             "replicate", "together_ai", "palm", "text-completion-openai",
             "command-r", "groq", "cerebras", "fireworks_ai", "friendliai",

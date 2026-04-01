@@ -113,6 +113,7 @@ const KNOWN_MODEL_PREFIXES = new Set([
   'gemini',
   'vertex_ai',
   'deepseek',
+  'minimax',
   'ollama',
   'cohere',
   'huggingface',
@@ -1015,8 +1016,9 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
               ) : (
                 <div className="space-y-4">
                   <div>
-                    <label className="mb-1 block text-xs text-muted-text">主模型</label>
+                    <label htmlFor="runtime-primary-model" className="mb-1 block text-xs text-muted-text">主模型</label>
                     <Select
+                      id="runtime-primary-model"
                       value={runtimeConfig.primaryModel}
                       onChange={setPrimaryModel}
                       options={buildModelOptions(availableModels, runtimeConfig.primaryModel, '自动（使用第一个可用模型）')}
@@ -1026,8 +1028,9 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-xs text-muted-text">Agent 主模型</label>
+                    <label htmlFor="runtime-agent-primary-model" className="mb-1 block text-xs text-muted-text">Agent 主模型</label>
                     <Select
+                      id="runtime-agent-primary-model"
                       value={runtimeConfig.agentPrimaryModel}
                       onChange={(value) => setRuntimeConfig((previous) => ({
                         ...previous,
@@ -1061,8 +1064,9 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-xs text-muted-text">Vision 模型</label>
+                    <label htmlFor="runtime-vision-model" className="mb-1 block text-xs text-muted-text">Vision 模型</label>
                     <Select
+                      id="runtime-vision-model"
                       value={runtimeConfig.visionModel}
                       onChange={(value) => setRuntimeConfig((previous) => ({ ...previous, visionModel: value }))}
                       options={buildModelOptions(availableModels, runtimeConfig.visionModel, '自动（跟随 Vision 默认逻辑）')}

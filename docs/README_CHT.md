@@ -102,6 +102,7 @@
 | `DISCORD_WEBHOOK_URL` | Discord Webhook URL | 可選 |
 | `DISCORD_BOT_TOKEN` | Discord Bot Token（與 Webhook 二選一） | 可選 |
 | `DISCORD_MAIN_CHANNEL_ID` | Discord Channel ID（使用 Bot 時需要） | 可選 |
+| `DISCORD_INTERACTIONS_PUBLIC_KEY` | Discord Public Key（僅接收入站 Interaction/Webhook 回調並進行簽名校驗時需要） | 可選 |
 | `SLACK_BOT_TOKEN` | Slack Bot Token（推薦，支援圖片上傳；同時配置時優先於 Webhook） | 可選 |
 | `SLACK_CHANNEL_ID` | Slack Channel ID（使用 Bot 時需要） | 可選 |
 | `SLACK_WEBHOOK_URL` | Slack Incoming Webhook URL（僅文字，不支援圖片） | 可選 |
@@ -153,6 +154,8 @@
 #### 5. 完成！
 
 默認每個工作日 **18:00（北京時間）** 自動執行
+
+> 斷點續傳與 `--dry-run` 的資料存在性判斷，現在會按股票所屬市場的本地時區與交易日曆解析「最新可復用交易日」；週末 / 節假日會復用最近交易日，交易日盤中會復用上一個已完成交易日，盤後若當日資料已落庫則可直接跳過。詳細規則見 [完整配置指南](full-guide.md)。
 
 ### 方式二：本地運行 / Docker 部署
 

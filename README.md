@@ -133,6 +133,7 @@
 | `DISCORD_WEBHOOK_URL` | Discord Webhook URL | 可选 |
 | `DISCORD_BOT_TOKEN` | Discord Bot Token（与 Webhook 二选一） | 可选 |
 | `DISCORD_MAIN_CHANNEL_ID` | Discord Channel ID（使用 Bot 时需要） | 可选 |
+| `DISCORD_INTERACTIONS_PUBLIC_KEY` | Discord Public Key（仅接收入站 Interaction/Webhook 回调并进行签名校验时需要） | 可选 |
 | `SLACK_BOT_TOKEN` | Slack Bot Token（推荐，支持图片上传；同时配置时优先于 Webhook） | 可选 |
 | `SLACK_CHANNEL_ID` | Slack Channel ID（使用 Bot 时需要） | 可选 |
 | `SLACK_WEBHOOK_URL` | Slack Incoming Webhook URL（仅文本，不支持图片） | 可选 |
@@ -241,6 +242,7 @@
 >
 > - **环境变量方式**：在 `.env` 或 GitHub Secrets 中设置，影响所有运行方式（定时触发、手动触发、本地运行）
 > - **UI 勾选方式**：仅在 GitHub Actions 手动触发时可见，不影响定时任务，适合临时需求
+> - **断点续传与 `--dry-run` 的数据存在性判断**：会按股票所属市场的本地时区和交易日历解析“最新可复用交易日”；周末/节假日复用最近交易日，交易日盘中复用上一已完成交易日，盘后若当日数据已落库则可直接跳过。详细规则见 [完整指南](docs/full-guide.md)。
 
 ### 方式二：本地运行 / Docker 部署
 

@@ -1000,6 +1000,20 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "validation": {},
         "display_order": 35,
     },
+    "DISCORD_INTERACTIONS_PUBLIC_KEY": {
+        "title": "Discord Interactions Public Key",
+        "description": "Discord public key used to verify inbound interaction/webhook signatures.",
+        "category": "notification",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": None,
+        "options": [],
+        "validation": {},
+        "display_order": 36,
+    },
     # ------------------------------------------------------------------
     # Notification – Slack  (Bot > Webhook when both configured)
     # ------------------------------------------------------------------
@@ -1015,7 +1029,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": None,
         "options": [],
         "validation": {},
-        "display_order": 36,
+        "display_order": 37,
     },
     "SLACK_CHANNEL_ID": {
         "title": "Slack Channel ID",
@@ -1029,7 +1043,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": None,
         "options": [],
         "validation": {},
-        "display_order": 37,
+        "display_order": 38,
     },
     "SLACK_WEBHOOK_URL": {
         "title": "Slack Incoming Webhook URL",
@@ -1043,7 +1057,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": None,
         "options": [],
         "validation": {},
-        "display_order": 38,
+        "display_order": 39,
     },
     # ------------------------------------------------------------------
     # Notification – Pushover

@@ -825,6 +825,55 @@ class SystemConfigService:
                 }
             )
 
+        feishu_relevant_keys = {
+            "FEISHU_APP_ID",
+            "FEISHU_APP_SECRET",
+            "FEISHU_WEBHOOK_URL",
+            "FEISHU_WEBHOOK_SECRET",
+            "FEISHU_WEBHOOK_KEYWORD",
+            "FEISHU_STREAM_ENABLED",
+            "FEISHU_FOLDER_TOKEN",
+        }
+        has_feishu_app_id = bool((effective_map.get("FEISHU_APP_ID") or "").strip())
+        has_feishu_app_secret = bool((effective_map.get("FEISHU_APP_SECRET") or "").strip())
+        has_feishu_app_credentials = has_feishu_app_id or has_feishu_app_secret
+        has_feishu_webhook = bool((effective_map.get("FEISHU_WEBHOOK_URL") or "").strip())
+        has_feishu_folder_token = bool((effective_map.get("FEISHU_FOLDER_TOKEN") or "").strip())
+        has_feishu_full_cloud_doc_credentials = (
+            has_feishu_app_id
+            and has_feishu_app_secret
+            and has_feishu_folder_token
+        )
+        # Match runtime semantics: Config.from_env only enables stream mode
+        # when the value is exactly "true" (case-insensitive).
+        feishu_stream_enabled = (
+            (effective_map.get("FEISHU_STREAM_ENABLED") or "false")
+            .strip()
+            .lower()
+            == "true"
+        )
+        if (
+            has_feishu_app_credentials
+            and not has_feishu_full_cloud_doc_credentials
+            and not has_feishu_webhook
+            and not (feishu_stream_enabled and has_feishu_app_id and has_feishu_app_secret)
+            and (updated_keys & feishu_relevant_keys)
+        ):
+            issues.append(
+                {
+                    "key": "FEISHU_WEBHOOK_URL",
+                    "code": "feishu_mode_mismatch",
+                    "message": (
+                        "仅配置 FEISHU_APP_ID / FEISHU_APP_SECRET 不会开启飞书群 Webhook 推送；"
+                        "如需通知推送请填写 FEISHU_WEBHOOK_URL，若要使用应用机器人请同时开启 "
+                        "FEISHU_STREAM_ENABLED 并完成应用发布与权限配置。"
+                    ),
+                    "severity": "warning",
+                    "expected": "FEISHU_WEBHOOK_URL or FEISHU_STREAM_ENABLED=true",
+                    "actual": "app credentials only",
+                }
+            )
+
         issues.extend(
             SystemConfigService._validate_llm_channel_map(
                 effective_map=effective_map,

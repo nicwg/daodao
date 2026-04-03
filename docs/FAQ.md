@@ -229,6 +229,43 @@ OPENAI_MODEL=deepseek-chat
 
 ---
 
+### Q12c: 运行时报 `OllamaException / APIConnectionError`（All LLM models failed）怎么办？
+
+**症状**：日志出现 `litellm.APIConnectionError: OllamaException` 或 `Analysis failed: All LLM models failed (tried 1 model(s))`。
+
+逐项排查以下 5 个检查点：
+
+1. **Ollama 服务是否已启动**
+   ```bash
+   # 查看进程
+   pgrep -a ollama
+   # 若无输出则先启动
+   ollama serve
+   ```
+   确认服务正在监听：`curl http://localhost:11434`，应返回 `Ollama is running`。
+
+2. **`OLLAMA_API_BASE` 是否配置正确**
+   - ✅ 正确：`OLLAMA_API_BASE=http://localhost:11434`
+   - ❌ 错误：把 Ollama 地址填到 `OPENAI_BASE_URL`，会导致 URL 路径拼错（如 `…/api/generate/api/show`）。
+
+3. **模型名称是否加了 `ollama/` 前缀**
+   - ✅ 正确：`LITELLM_MODEL=ollama/qwen3:8b`
+   - ❌ 错误：`LITELLM_MODEL=qwen3:8b`（缺少前缀，litellm 无法路由到 Ollama）
+
+4. **模型是否已下载到本地**
+   ```bash
+   ollama list          # 查看已有模型
+   ollama pull qwen3:8b # 如无则先拉取
+   ```
+
+5. **远程部署 / Docker 时的网络与防火墙**
+   - 若 Ollama 和程序不在同一主机，需将 `OLLAMA_API_BASE` 改为实际 IP，如 `http://192.168.1.100:11434`。
+   - 确认防火墙已放行 11434 端口，且 Ollama 启动时绑定了正确地址（`OLLAMA_HOST=0.0.0.0:11434`）。
+
+> 完整配置示例见 [LLM 配置指南 → 示例 4（Ollama）](LLM_CONFIG_GUIDE.md#example-4-ollama)。
+
+---
+
 ## 🐳 Docker 相关
 
 ### Q13: Docker 容器启动后立即退出？
@@ -331,4 +368,4 @@ python main.py --market-only
 
 ---
 
-*最后更新：2026-02-28*
+*最后更新：2026-04-01*

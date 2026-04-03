@@ -337,6 +337,31 @@ class TestValidateStructuredNotification:
         issues = cfg.validate_structured()
         assert not any(i.severity == "warning" and "通知渠道" in i.message for i in issues)
 
+    def test_feishu_app_credentials_without_webhook_warns_mode_mismatch(self):
+        cfg = _make_config(
+            wechat_webhook_url=None,
+            feishu_app_id="cli_xxx",
+            feishu_app_secret="secret_xxx",
+            feishu_webhook_url=None,
+            feishu_stream_enabled=False,
+        )
+        issues = cfg.validate_structured()
+        warn = [i for i in issues if i.severity == "warning"]
+        assert any("FEISHU_APP_ID / FEISHU_APP_SECRET" in i.message for i in warn)
+
+    def test_feishu_cloud_doc_credentials_without_webhook_no_mode_warning(self):
+        cfg = _make_config(
+            wechat_webhook_url=None,
+            feishu_app_id="cli_xxx",
+            feishu_app_secret="secret_xxx",
+            feishu_folder_token="folder_xxx",
+            feishu_webhook_url=None,
+            feishu_stream_enabled=False,
+        )
+        issues = cfg.validate_structured()
+        warn = [i for i in issues if i.severity == "warning"]
+        assert not any("FEISHU_APP_ID / FEISHU_APP_SECRET" in i.message for i in warn)
+
     def test_no_search_engine_is_info(self):
         cfg = _make_config(searxng_public_instances_enabled=False)
         issues = cfg.validate_structured()

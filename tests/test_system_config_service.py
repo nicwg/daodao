@@ -177,6 +177,70 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         self.assertFalse(validation["valid"])
         self.assertTrue(any(issue["code"] == "invalid_type" for issue in validation["issues"]))
 
+    def test_validate_reports_invalid_feishu_webhook_url(self) -> None:
+        validation = self.service.validate(
+            items=[{"key": "FEISHU_WEBHOOK_URL", "value": "feishu-hook-without-scheme"}]
+        )
+        self.assertFalse(validation["valid"])
+        self.assertTrue(any(issue["code"] == "invalid_url" for issue in validation["issues"]))
+
+    def test_validate_warns_when_feishu_app_credentials_are_used_without_webhook(self) -> None:
+        validation = self.service.validate(
+            items=[
+                {"key": "FEISHU_APP_ID", "value": "cli_xxx"},
+                {"key": "FEISHU_APP_SECRET", "value": "secret_xxx"},
+            ]
+        )
+        self.assertTrue(validation["valid"])
+        self.assertTrue(
+            any(
+                issue["code"] == "feishu_mode_mismatch"
+                and issue["severity"] == "warning"
+                for issue in validation["issues"]
+            )
+        )
+
+    def test_validate_no_warning_when_feishu_cloud_doc_credentials_without_webhook(self) -> None:
+        validation = self.service.validate(
+            items=[
+                {"key": "FEISHU_APP_ID", "value": "cli_xxx"},
+                {"key": "FEISHU_APP_SECRET", "value": "secret_xxx"},
+                {"key": "FEISHU_FOLDER_TOKEN", "value": "folder_xxx"},
+            ]
+        )
+        self.assertTrue(validation["valid"])
+        self.assertFalse(
+            any(
+                issue["code"] == "feishu_mode_mismatch"
+                and issue["severity"] == "warning"
+                for issue in validation["issues"]
+            )
+        )
+
+    def test_validate_warns_when_only_folder_token_cleared_with_app_credentials(self) -> None:
+        """Clearing FEISHU_FOLDER_TOKEN while app credentials remain should trigger mismatch."""
+        old_version = self.manager.get_config_version()
+        self.service.update(
+            config_version=old_version,
+            items=[
+                {"key": "FEISHU_APP_ID", "value": "cli_xxx"},
+                {"key": "FEISHU_APP_SECRET", "value": "secret_xxx"},
+            ],
+        )
+        validation = self.service.validate(
+            items=[
+                {"key": "FEISHU_FOLDER_TOKEN", "value": ""},
+            ]
+        )
+        self.assertTrue(validation["valid"])
+        self.assertTrue(
+            any(
+                issue["code"] == "feishu_mode_mismatch"
+                and issue["severity"] == "warning"
+                for issue in validation["issues"]
+            )
+        )
+
     def test_update_persists_public_searxng_toggle(self) -> None:
         old_version = self.manager.get_config_version()
         response = self.service.update(

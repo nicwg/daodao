@@ -227,6 +227,43 @@ Supported model services:
 
 ---
 
+### Q12c: Getting `OllamaException / APIConnectionError` (All LLM models failed)?
+
+**Symptom**: Log shows `litellm.APIConnectionError: OllamaException` or `Analysis failed: All LLM models failed (tried 1 model(s))`.
+
+Work through the following 5 checkpoints in order:
+
+1. **Is the Ollama service running?**
+   ```bash
+   # Check process
+   pgrep -a ollama
+   # If no output, start it first
+   ollama serve
+   ```
+   Verify it is listening: `curl http://localhost:11434` should return `Ollama is running`.
+
+2. **Is `OLLAMA_API_BASE` set correctly?**
+   - ✅ Correct: `OLLAMA_API_BASE=http://localhost:11434`
+   - ❌ Wrong: Putting the Ollama address in `OPENAI_BASE_URL` causes the URL path to be mangled (e.g. `…/api/generate/api/show`).
+
+3. **Does the model name include the `ollama/` prefix?**
+   - ✅ Correct: `LITELLM_MODEL=ollama/qwen3:8b`
+   - ❌ Wrong: `LITELLM_MODEL=qwen3:8b` (missing prefix — litellm cannot route to Ollama)
+
+4. **Has the model been pulled locally?**
+   ```bash
+   ollama list           # list downloaded models
+   ollama pull qwen3:8b  # pull if missing
+   ```
+
+5. **Network / firewall for remote or Docker deployments**
+   - If Ollama runs on a different host, set `OLLAMA_API_BASE` to its actual IP, e.g. `http://192.168.1.100:11434`.
+   - Make sure port 11434 is open and Ollama binds the right address (`OLLAMA_HOST=0.0.0.0:11434`).
+
+> See [LLM Config Guide → Example 4 (Ollama)](LLM_CONFIG_GUIDE_EN.md#example-4-ollama) for a complete configuration example.
+
+---
+
 ## Docker Related
 
 ### Q13: Docker container exits immediately after starting?
@@ -287,4 +324,4 @@ If the above content doesn't solve your issue, welcome to:
 
 ---
 
-*Last updated: 2026-02-01*
+*Last updated: 2026-04-01*

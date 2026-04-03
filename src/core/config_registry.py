@@ -825,7 +825,24 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     # ------------------------------------------------------------------
     "FEISHU_WEBHOOK_URL": {
         "title": "Feishu Webhook URL",
-        "description": "Webhook URL for Feishu (Lark) bot notifications.",
+        "description": "Feishu custom bot webhook URL for group notifications. This is the webhook push channel; FEISHU_APP_ID / FEISHU_APP_SECRET do not enable webhook delivery by themselves.",
+        "category": "notification",
+        "data_type": "string",
+        "ui_control": "password",
+        "is_sensitive": True,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": None,
+        "options": [],
+        "validation": {
+            "item_type": "url",
+            "allowed_schemes": ["http", "https"],
+        },
+        "display_order": 12,
+    },
+    "FEISHU_WEBHOOK_SECRET": {
+        "title": "Feishu Webhook Secret",
+        "description": "Optional signing secret from Feishu custom bot security settings. Only used for webhook push mode.",
         "category": "notification",
         "data_type": "string",
         "ui_control": "password",
@@ -835,11 +852,11 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": None,
         "options": [],
         "validation": {},
-        "display_order": 12,
+        "display_order": 13,
     },
-    "FEISHU_APP_ID": {
-        "title": "Feishu App ID",
-        "description": "Feishu app bot App ID (for event-driven bot mode).",
+    "FEISHU_WEBHOOK_KEYWORD": {
+        "title": "Feishu Webhook Keyword",
+        "description": "Optional keyword required by Feishu custom bot security settings. The sender prepends it to every webhook message.",
         "category": "notification",
         "data_type": "string",
         "ui_control": "text",
@@ -849,11 +866,25 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": None,
         "options": [],
         "validation": {},
-        "display_order": 13,
+        "display_order": 14,
+    },
+    "FEISHU_APP_ID": {
+        "title": "Feishu App ID",
+        "description": "Feishu app bot App ID for app/stream bot mode or cloud documents. It does not enable group webhook push by itself.",
+        "category": "notification",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": None,
+        "options": [],
+        "validation": {},
+        "display_order": 15,
     },
     "FEISHU_APP_SECRET": {
         "title": "Feishu App Secret",
-        "description": "Feishu app bot App Secret.",
+        "description": "Feishu app bot App Secret for app/stream bot mode or cloud documents. It does not enable group webhook push by itself.",
         "category": "notification",
         "data_type": "string",
         "ui_control": "password",
@@ -863,7 +894,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": None,
         "options": [],
         "validation": {},
-        "display_order": 14,
+        "display_order": 16,
     },
     # ------------------------------------------------------------------
     # Notification – Telegram
@@ -880,7 +911,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": None,
         "options": [],
         "validation": {},
-        "display_order": 15,
+        "display_order": 17,
     },
     "TELEGRAM_CHAT_ID": {
         "title": "Telegram Chat ID",
@@ -894,7 +925,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": None,
         "options": [],
         "validation": {},
-        "display_order": 16,
+        "display_order": 18,
     },
     "TELEGRAM_MESSAGE_THREAD_ID": {
         "title": "Telegram Thread ID",
@@ -908,7 +939,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": None,
         "options": [],
         "validation": {},
-        "display_order": 17,
+        "display_order": 19,
     },
     # ------------------------------------------------------------------
     # Notification – Email

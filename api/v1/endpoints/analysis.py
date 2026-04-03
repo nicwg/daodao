@@ -516,8 +516,8 @@ async def task_stream():
                         "timestamp": datetime.now().isoformat()
                     })
         except asyncio.CancelledError:
-            # 客户端断开连接
-            pass
+            logger.debug("SSE client disconnected, cancelling event generator")
+            raise
         finally:
             task_queue.unsubscribe(event_queue)
     

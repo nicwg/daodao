@@ -209,6 +209,34 @@ sudo firewall-cmd --reload
 - 直接部署：默认 8000，可通过 `WEBUI_PORT=xxxx` 修改
 - Docker：默认 8000，可通过 `API_PORT=xxxx` 修改
 
+### 5. 页面能打开，但 UI 元素异常变大 / 布局错乱
+
+**症状**：浏览器能访问到 8000 端口，页面有内容，但文字、按钮、卡片尺寸异常大，没有正常布局与配色。
+
+**根因**：`static/index.html` 存在但 CSS/JS 资源缺失（`static/assets/` 为空或不存在），浏览器加载了 HTML 框架但无法拿到样式与脚本，退化为裸 HTML 渲染。
+
+可先用浏览器开发者工具（F12 → Network 标签页）检查是否有 `/assets/index-*.js`、`/assets/index-*.css` 的 **404** 错误。若有，按以下方式修复：
+
+**Docker 用户**：
+
+```bash
+docker-compose -f ./docker/docker-compose.yml down
+docker-compose -f ./docker/docker-compose.yml build --no-cache
+docker-compose -f ./docker/docker-compose.yml up -d
+```
+
+重建完成后，用 `Ctrl+Shift+R` 强制刷新浏览器缓存，再访问页面。
+
+**直接部署用户**：先确保已安装 Node.js 18+（推荐 20+），然后手动构建前端：
+
+```bash
+cd apps/dsa-web
+npm ci
+npm run build
+cd ../..
+python main.py --webui-only
+```
+
 ---
 
 ## 可选：Nginx 反向代理（绑定域名 / 80 端口）

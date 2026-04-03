@@ -2860,6 +2860,16 @@ class SearchService:
                     'strict_freshness': not is_index_etf,
                 },
                 {
+                    'name': 'announcements',
+                    'query': (
+                        f"{stock_name} {stock_code} 公告 指数调整 成分变化"
+                        if is_index_etf else f"{stock_name} {stock_code} 公司公告 重要公告 上交所 深交所 cninfo"
+                    ),
+                    'desc': '公司公告',
+                    'tavily_topic': 'news',
+                    'strict_freshness': True,
+                },
+                {
                     'name': 'earnings',
                     'query': (
                         f"{stock_name} 指数成分 净值 跟踪表现"
@@ -2973,8 +2983,17 @@ class SearchService:
         lines = [f"【{stock_name} 情报搜索结果】"]
         
         # 维度展示顺序
-        display_order = ['latest_news', 'market_analysis', 'risk_check', 'earnings', 'industry']
-        
+        display_order = ['latest_news', 'announcements', 'market_analysis', 'risk_check', 'earnings', 'industry']
+
+        dim_labels = {
+            'latest_news': '📰 最新消息',
+            'announcements': '📋 公司公告',
+            'market_analysis': '📈 机构分析',
+            'risk_check': '⚠️ 风险排查',
+            'earnings': '📊 业绩预期',
+            'industry': '🏭 行业分析',
+        }
+
         for dim_name in display_order:
             if dim_name not in intel_results:
                 continue
@@ -2982,12 +3001,7 @@ class SearchService:
             resp = intel_results[dim_name]
             
             # 获取维度描述
-            dim_desc = dim_name
-            if dim_name == 'latest_news': dim_desc = '📰 最新消息'
-            elif dim_name == 'market_analysis': dim_desc = '📈 机构分析'
-            elif dim_name == 'risk_check': dim_desc = '⚠️ 风险排查'
-            elif dim_name == 'earnings': dim_desc = '📊 业绩预期'
-            elif dim_name == 'industry': dim_desc = '🏭 行业分析'
+            dim_desc = dim_labels.get(dim_name, dim_name)
             
             lines.append(f"\n{dim_desc} (来源: {resp.provider}):")
             if resp.success and resp.results:

@@ -9,7 +9,9 @@ import json
 import re
 import time
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse, urlunparse
+
+import requests
 
 from src.config import (
     SUPPORTED_LLM_CHANNEL_PROTOCOLS,
@@ -235,6 +237,139 @@ class SystemConfigService:
             mask_token="__DSA_IMPORT_LITERAL_MASK__",
             reload_now=reload_now,
         )
+
+    def discover_llm_channel_models(
+        self,
+        *,
+        name: str,
+        protocol: str,
+        base_url: str,
+        api_key: str,
+        models: Sequence[str] = (),
+        timeout_seconds: float = 20.0,
+        ) -> Dict[str, Any]:
+        """Discover available models from an OpenAI-compatible `/models` endpoint."""
+        channel_name = name.strip() or "channel"
+        existing_models = [str(m).strip() for m in models if str(m).strip()]
+        validation_issues, resolved_protocol = self._validate_llm_channel_connection(
+            channel_name=channel_name,
+            protocol_value=protocol,
+            base_url_value=base_url,
+            api_key_value=api_key,
+            model_values=existing_models,
+            field_prefix="discover_channel",
+            require_base_url=True,
+        )
+        if not resolved_protocol and existing_models:
+            resolved_protocol = resolve_llm_channel_protocol(
+                protocol,
+                base_url=base_url,
+                models=existing_models,
+                channel_name=channel_name,
+            )
+        errors = [issue for issue in validation_issues if issue["severity"] == "error"]
+        if errors:
+            return {
+                "success": False,
+                "message": "LLM channel configuration is invalid",
+                "error": errors[0]["message"],
+                "resolved_protocol": resolved_protocol or None,
+                "models": [],
+                "latency_ms": None,
+            }
+
+        if resolved_protocol not in {"openai", "deepseek"}:
+            return {
+                "success": False,
+                "message": "Model discovery is not supported for this protocol",
+                "error": (
+                    f"LLM channel '{channel_name}' protocol '{resolved_protocol}' "
+                    "does not support /models discovery yet"
+                ),
+                "resolved_protocol": resolved_protocol or None,
+                "models": [],
+                "latency_ms": None,
+            }
+
+        api_keys = [segment.strip() for segment in api_key.split(",") if segment.strip()]
+        selected_api_key = api_keys[0] if api_keys else ""
+        request_headers = {"Accept": "application/json"}
+        if selected_api_key:
+            request_headers["Authorization"] = f"Bearer {selected_api_key}"
+
+        models_url = self._build_llm_models_url(base_url)
+
+        try:
+            started_at = time.perf_counter()
+            response = requests.get(
+                models_url,
+                headers=request_headers,
+                timeout=max(5.0, float(timeout_seconds)),
+                allow_redirects=False,
+            )
+            latency_ms = int((time.perf_counter() - started_at) * 1000)
+        except requests.RequestException as exc:
+            logger.warning("LLM channel model discovery failed for %s: %s", channel_name, exc)
+            return {
+                "success": False,
+                "message": "Failed to discover models",
+                "error": str(exc),
+                "resolved_protocol": resolved_protocol or None,
+                "models": [],
+                "latency_ms": None,
+            }
+
+        if 300 <= response.status_code < 400:
+            return {
+                "success": False,
+                "message": "Model discovery request was redirected",
+                "error": "Redirect responses are not allowed for model discovery",
+                "resolved_protocol": resolved_protocol or None,
+                "models": [],
+                "latency_ms": latency_ms,
+            }
+
+        if not response.ok:
+            return {
+                "success": False,
+                "message": "Model discovery request failed",
+                "error": self._extract_llm_discovery_error(response),
+                "resolved_protocol": resolved_protocol or None,
+                "models": [],
+                "latency_ms": latency_ms,
+            }
+
+        try:
+            payload = response.json()
+        except ValueError:
+            return {
+                "success": False,
+                "message": "Model discovery returned invalid JSON",
+                "error": "The /models endpoint did not return valid JSON",
+                "resolved_protocol": resolved_protocol or None,
+                "models": [],
+                "latency_ms": latency_ms,
+            }
+
+        models = self._extract_discovered_llm_models(payload)
+        if not models:
+            return {
+                "success": False,
+                "message": "Model discovery returned no models",
+                "error": "The /models endpoint did not return any model IDs",
+                "resolved_protocol": resolved_protocol or None,
+                "models": [],
+                "latency_ms": latency_ms,
+            }
+
+        return {
+            "success": True,
+            "message": "LLM channel model discovery succeeded",
+            "error": None,
+            "resolved_protocol": resolved_protocol or None,
+            "models": models,
+            "latency_ms": latency_ms,
+        }
 
     def test_llm_channel(
         self,
@@ -805,6 +940,81 @@ class SystemConfigService:
         return True
 
     @staticmethod
+    def _build_llm_models_url(base_url: str) -> str:
+        """Convert a channel base URL into a `/models` endpoint."""
+        parsed = urlparse(base_url.strip())
+        normalized = (parsed.path or "").rstrip("/")
+        for suffix in ("/chat/completions", "/completions"):
+            if normalized.endswith(suffix):
+                normalized = normalized[: -len(suffix)]
+                break
+        if normalized.endswith("/models"):
+            models_path = normalized or "/models"
+        else:
+            models_path = f"{normalized}/models" if normalized else "/models"
+        return urlunparse(parsed._replace(path=models_path, params="", query="", fragment=""))
+
+    @staticmethod
+    def _extract_llm_discovery_error(response: requests.Response) -> str:
+        """Extract a concise error message from a failed model discovery response."""
+        try:
+            payload = response.json()
+        except ValueError:
+            payload = None
+
+        if isinstance(payload, dict):
+            error_payload = payload.get("error")
+            if isinstance(error_payload, dict):
+                message = str(
+                    error_payload.get("message")
+                    or error_payload.get("code")
+                    or ""
+                ).strip()
+                if message:
+                    return message
+
+            message = str(payload.get("message") or payload.get("detail") or "").strip()
+            if message:
+                return message
+
+        text = response.text.strip()
+        if text:
+            return text[:200]
+        return f"HTTP {response.status_code}"
+
+    @staticmethod
+    def _extract_discovered_llm_models(payload: Any) -> List[str]:
+        """Normalize common `/models` response shapes into a unique model ID list."""
+        raw_models: List[Any] = []
+        if isinstance(payload, dict):
+            if isinstance(payload.get("data"), list):
+                raw_models = payload["data"]
+            elif isinstance(payload.get("models"), list):
+                raw_models = payload["models"]
+        elif isinstance(payload, list):
+            raw_models = payload
+
+        models: List[str] = []
+        seen: Set[str] = set()
+        for entry in raw_models:
+            if isinstance(entry, str):
+                model_id = entry.strip()
+            elif isinstance(entry, dict):
+                model_id = str(
+                    entry.get("id") or entry.get("model") or entry.get("name") or ""
+                ).strip()
+            else:
+                model_id = ""
+
+            if not model_id or model_id in seen:
+                continue
+
+            seen.add(model_id)
+            models.append(model_id)
+
+        return models
+
+    @staticmethod
     def _validate_cross_field(effective_map: Dict[str, str], updated_keys: Set[str]) -> List[Dict[str, Any]]:
         """Validate dependencies across multiple keys."""
         issues: List[Dict[str, Any]] = []
@@ -1247,69 +1457,19 @@ class SystemConfigService:
         require_complete: bool,
     ) -> List[Dict[str, Any]]:
         """Validate one normalized LLM channel definition."""
-        issues: List[Dict[str, Any]] = []
-        protocol_key = f"{field_prefix}_PROTOCOL" if field_prefix != "test_channel" else "protocol"
-        base_url_key = f"{field_prefix}_BASE_URL" if field_prefix != "test_channel" else "base_url"
-        api_key_key = f"{field_prefix}_API_KEY" if field_prefix != "test_channel" else "api_key"
-        models_key = f"{field_prefix}_MODELS" if field_prefix != "test_channel" else "models"
-
         if not require_complete:
-            return issues
+            return []
 
-        normalized_protocol = canonicalize_llm_channel_protocol(protocol_value)
-        if normalized_protocol and normalized_protocol not in SUPPORTED_LLM_CHANNEL_PROTOCOLS:
-            issues.append(
-                {
-                    "key": protocol_key,
-                    "code": "invalid_protocol",
-                    "message": (
-                        f"Unsupported LLM channel protocol '{protocol_value}'. "
-                        f"Supported: {', '.join(SUPPORTED_LLM_CHANNEL_PROTOCOLS)}"
-                    ),
-                    "severity": "error",
-                    "expected": ",".join(SUPPORTED_LLM_CHANNEL_PROTOCOLS),
-                    "actual": protocol_value,
-                }
-            )
-
-        if base_url_value and not SystemConfigService._is_valid_url(base_url_value, allowed_schemes=("http", "https")):
-            issues.append(
-                {
-                    "key": base_url_key,
-                    "code": "invalid_url",
-                    "message": "LLM channel base URL must be a valid absolute URL",
-                    "severity": "error",
-                    "expected": "http(s)://host",
-                    "actual": base_url_value,
-                }
-            )
-        elif base_url_value and not SystemConfigService._is_safe_base_url(base_url_value):
-            issues.append(
-                {
-                    "key": base_url_key,
-                    "code": "ssrf_blocked",
-                    "message": "LLM channel base URL points to a restricted address (cloud metadata services are not allowed)",
-                    "severity": "error",
-                    "expected": "publicly reachable or local LLM endpoint",
-                    "actual": base_url_value,
-                }
-            )
-
-        resolved_protocol = resolve_llm_channel_protocol(protocol_value, base_url=base_url_value, models=list(model_values), channel_name=channel_name)
-        # Validate parsed key segments so that inputs like "," or " , " are
-        # treated as empty (they produce zero usable keys after split+strip).
-        _parsed_api_keys = [seg.strip() for seg in api_key_value.split(",") if seg.strip()]
-        if not _parsed_api_keys and not channel_allows_empty_api_key(resolved_protocol, base_url_value):
-            issues.append(
-                {
-                    "key": api_key_key,
-                    "code": "missing_api_key",
-                    "message": f"LLM channel '{channel_name}' requires an API key",
-                    "severity": "error",
-                    "expected": "non-empty API key",
-                    "actual": api_key_value,
-                }
-            )
+        issues, resolved_protocol = SystemConfigService._validate_llm_channel_connection(
+            channel_name=channel_name,
+            protocol_value=protocol_value,
+            base_url_value=base_url_value,
+            api_key_value=api_key_value,
+            model_values=model_values,
+            field_prefix=field_prefix,
+            require_base_url=False,
+        )
+        models_key = f"{field_prefix}_MODELS" if field_prefix != "test_channel" else "models"
 
         if not model_values:
             issues.append(
@@ -1340,3 +1500,95 @@ class SystemConfigService:
                 )
 
         return issues
+
+    @staticmethod
+    def _validate_llm_channel_connection(
+        *,
+        channel_name: str,
+        protocol_value: str,
+        base_url_value: str,
+        api_key_value: str,
+        model_values: Sequence[str] = (),
+        field_prefix: str,
+        require_base_url: bool,
+    ) -> Tuple[List[Dict[str, Any]], str]:
+        """Validate connection-level fields shared by test and discovery flows."""
+        issues: List[Dict[str, Any]] = []
+        protocol_key = f"{field_prefix}_PROTOCOL" if field_prefix != "test_channel" else "protocol"
+        base_url_key = f"{field_prefix}_BASE_URL" if field_prefix != "test_channel" else "base_url"
+        api_key_key = f"{field_prefix}_API_KEY" if field_prefix != "test_channel" else "api_key"
+
+        normalized_protocol = canonicalize_llm_channel_protocol(protocol_value)
+        if normalized_protocol and normalized_protocol not in SUPPORTED_LLM_CHANNEL_PROTOCOLS:
+            issues.append(
+                {
+                    "key": protocol_key,
+                    "code": "invalid_protocol",
+                    "message": (
+                        f"Unsupported LLM channel protocol '{protocol_value}'. "
+                        f"Supported: {', '.join(SUPPORTED_LLM_CHANNEL_PROTOCOLS)}"
+                    ),
+                    "severity": "error",
+                    "expected": ",".join(SUPPORTED_LLM_CHANNEL_PROTOCOLS),
+                    "actual": protocol_value,
+                }
+            )
+
+        if require_base_url and not base_url_value.strip():
+            issues.append(
+                {
+                    "key": base_url_key,
+                    "code": "missing_base_url",
+                    "message": f"LLM channel '{channel_name}' requires a base URL to discover models",
+                    "severity": "error",
+                    "expected": "http(s)://host/v1",
+                    "actual": "",
+                }
+            )
+        elif base_url_value and not SystemConfigService._is_valid_url(
+            base_url_value,
+            allowed_schemes=("http", "https"),
+        ):
+            issues.append(
+                {
+                    "key": base_url_key,
+                    "code": "invalid_url",
+                    "message": "LLM channel base URL must be a valid absolute URL",
+                    "severity": "error",
+                    "expected": "http(s)://host",
+                    "actual": base_url_value,
+                }
+            )
+        elif base_url_value and not SystemConfigService._is_safe_base_url(base_url_value):
+            issues.append(
+                {
+                    "key": base_url_key,
+                    "code": "ssrf_blocked",
+                    "message": "LLM channel base URL points to a restricted address (cloud metadata services are not allowed)",
+                    "severity": "error",
+                    "expected": "publicly reachable or local LLM endpoint",
+                    "actual": base_url_value,
+                }
+            )
+
+        resolved_protocol = resolve_llm_channel_protocol(
+            protocol_value,
+            base_url=base_url_value,
+            models=list(model_values) if model_values else None,
+            channel_name=channel_name,
+        )
+        # Validate parsed key segments so that inputs like "," or " , " are
+        # treated as empty (they produce zero usable keys after split+strip).
+        _parsed_api_keys = [seg.strip() for seg in api_key_value.split(",") if seg.strip()]
+        if not _parsed_api_keys and not channel_allows_empty_api_key(resolved_protocol, base_url_value):
+            issues.append(
+                {
+                    "key": api_key_key,
+                    "code": "missing_api_key",
+                    "message": f"LLM channel '{channel_name}' requires an API key",
+                    "severity": "error",
+                    "expected": "non-empty API key",
+                    "actual": api_key_value,
+                }
+            )
+        return issues, resolved_protocol

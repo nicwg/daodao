@@ -68,6 +68,8 @@ LITELLM_MODEL=ollama/qwen3:8b
 
 **Configure via Web UI directly:** After starting the application, you can do this visually under **System Settings -> AI Model -> AI Model Access** in the Web UI.
 
+> **New editor behavior**: For DeepSeek, DashScope, and other OpenAI-compatible providers that expose `/v1/models`, the settings page can now fetch models directly from `{base_url}/models` and let you select multiple entries visually. The underlying storage format is still the existing comma-separated `LLM_{CHANNEL}_MODELS=model1,model2` value. If a provider does not support `/models`, authentication fails, or the endpoint is temporarily unavailable, you can still type the model list manually and save normally.
+
 If you prefer modifying files, configuring this in the `.env` file is also very smooth. It allows you to manage multiple platforms simultaneously. The rules are:
 
 1. **Declare your channels first**: `LLM_CHANNELS=channel_name_1,channel_name_2`

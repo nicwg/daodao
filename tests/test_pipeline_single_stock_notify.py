@@ -58,7 +58,7 @@ class _TrackingNotifier:
         return True
 
 
-def _make_result(code: str) -> AnalysisResult:
+def _make_result(code: str, success: bool = True) -> AnalysisResult:
     return AnalysisResult(
         code=code,
         name=f"股票{code}",
@@ -66,6 +66,8 @@ def _make_result(code: str) -> AnalysisResult:
         trend_prediction="看多",
         operation_advice="持有",
         analysis_summary="测试结果",
+        success=success,
+        error_message=None if success else "JSON解析失败",
     )
 
 
@@ -141,6 +143,25 @@ class TestPipelineSingleStockNotify(unittest.TestCase):
             "brief:600519",
             email_stock_codes=["600519"],
         )
+
+    def test_process_single_stock_direct_path_does_not_notify_when_failed(self):
+        pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+        pipeline.fetch_and_save_stock_data = MagicMock(return_value=(True, None))
+        pipeline.analyze_stock = MagicMock(return_value=_make_result("600519", success=False))
+        pipeline.notifier = _TrackingNotifier()
+
+        result = pipeline.process_single_stock(
+            code="600519",
+            skip_analysis=False,
+            single_stock_notify=True,
+            report_type=ReportType.BRIEF,
+            analysis_query_id="query-1",
+        )
+
+        self.assertIsNotNone(result)
+        self.assertFalse(result.success)
+        pipeline.notifier.generate_brief_report.assert_not_called()
+        pipeline.notifier.send.assert_not_called()
 
 
 if __name__ == "__main__":

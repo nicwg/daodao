@@ -632,6 +632,10 @@ class Config:
 
     # === 数据库配置 ===
     database_path: str = "./data/stock_analysis.db"
+    sqlite_wal_enabled: bool = True
+    sqlite_busy_timeout_ms: int = 5000
+    sqlite_write_retry_max: int = 3
+    sqlite_write_retry_base_delay: float = 0.1
 
     # 是否保存分析上下文快照（用于历史回溯）
     save_context_snapshot: bool = True
@@ -1267,6 +1271,25 @@ class Config:
             md2img_engine=cls._parse_md2img_engine(os.getenv('MD2IMG_ENGINE', 'wkhtmltoimage')),
             prefetch_realtime_quotes=os.getenv('PREFETCH_REALTIME_QUOTES', 'true').lower() == 'true',
             database_path=os.getenv('DATABASE_PATH', './data/stock_analysis.db'),
+            sqlite_wal_enabled=os.getenv('SQLITE_WAL_ENABLED', 'true').lower() == 'true',
+            sqlite_busy_timeout_ms=parse_env_int(
+                os.getenv('SQLITE_BUSY_TIMEOUT_MS'),
+                5000,
+                field_name='SQLITE_BUSY_TIMEOUT_MS',
+                minimum=0,
+            ),
+            sqlite_write_retry_max=parse_env_int(
+                os.getenv('SQLITE_WRITE_RETRY_MAX'),
+                3,
+                field_name='SQLITE_WRITE_RETRY_MAX',
+                minimum=0,
+            ),
+            sqlite_write_retry_base_delay=parse_env_float(
+                os.getenv('SQLITE_WRITE_RETRY_BASE_DELAY'),
+                0.1,
+                field_name='SQLITE_WRITE_RETRY_BASE_DELAY',
+                minimum=0.0,
+            ),
             save_context_snapshot=os.getenv('SAVE_CONTEXT_SNAPSHOT', 'true').lower() == 'true',
             backtest_enabled=os.getenv('BACKTEST_ENABLED', 'true').lower() == 'true',
             backtest_eval_window_days=parse_env_int(os.getenv('BACKTEST_EVAL_WINDOW_DAYS'), 10, field_name='BACKTEST_EVAL_WINDOW_DAYS', minimum=1),

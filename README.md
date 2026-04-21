@@ -294,6 +294,7 @@ LITELLM_MODEL=openai/deepseek-chat
 
 > Docker 部署、定时任务配置请参考 [完整指南](docs/full-guide.md)
 > 桌面客户端打包请参考 [桌面端打包说明](docs/desktop-package.md)
+> Docker 安装时请优先以你实际拉取/运行的**镜像 tag** 判断版本（如 `v3.12.0`）；仓库的 Docker 发布由 `.github/workflows/docker-publish.yml` 按 `v*.*.*` Git tag 触发，和 `apps/dsa-web/package.json` 里的占位版本 `0.0.0` 不是一回事。常见查询方式见 [FAQ：Docker 版本号看哪里](docs/FAQ.md#q142-docker-安装时软件版本号写在哪个文件里)。
 
 ## 📱 推送效果
 

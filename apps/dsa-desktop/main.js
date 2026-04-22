@@ -4,6 +4,7 @@ const fs = require('fs');
 const { spawn } = require('child_process');
 const net = require('net');
 const http = require('http');
+const { TextDecoder } = require('util');
 
 let mainWindow = null;
 let backendProcess = null;
@@ -74,6 +75,27 @@ function logLine(message) {
     console.error(error);
   }
   console.log(line.trim());
+}
+
+function decodeBackendOutput(data, decoder) {
+  if (typeof data === 'string') {
+    return data.trim();
+  }
+  if (!Buffer.isBuffer(data)) {
+    return String(data).trim();
+  }
+
+  let decoded = decoder.decode(data, { stream: true });
+
+  // Windows 控制台 / 子进程有时仍会吐出本地代码页字节，优先在明显乱码时回退到 GBK。
+  if (isWindows && decoded.includes('\uFFFD')) {
+    try {
+      decoded = new TextDecoder('gbk', { fatal: false }).decode(data, { stream: true });
+    } catch (_error) {
+    }
+  }
+
+  return decoded.trim();
 }
 
 function formatCommand(command, args = []) {
@@ -295,6 +317,7 @@ function startBackend({ port, envFile, dbPath, logDir }) {
     DATABASE_PATH: dbPath,
     LOG_DIR: logDir,
     PYTHONUTF8: '1',
+    PYTHONIOENCODING: 'utf-8',
     SCHEDULE_ENABLED: 'false',
     WEBUI_ENABLED: 'false',
     BOT_ENABLED: 'false',
@@ -323,10 +346,11 @@ function startBackend({ port, envFile, dbPath, logDir }) {
   } else {
     const pythonPath = resolvePythonPath();
     const scriptPath = path.join(appRootDev, 'main.py');
+    const pythonArgs = ['-X', 'utf8', scriptPath, ...args];
     launchMode = 'development';
-    launchCommand = formatCommand(pythonPath, [scriptPath, ...args]);
+    launchCommand = formatCommand(pythonPath, pythonArgs);
     launchCwd = appRootDev;
-    backendProcess = spawn(pythonPath, [scriptPath, ...args], {
+    backendProcess = spawn(pythonPath, pythonArgs, {
       env,
       cwd: launchCwd,
       stdio: 'pipe',
@@ -337,6 +361,8 @@ function startBackend({ port, envFile, dbPath, logDir }) {
   if (backendProcess) {
     let firstStdoutLogged = false;
     let firstStderrLogged = false;
+    const stdoutDecoder = new TextDecoder('utf-8', { fatal: false });
+    const stderrDecoder = new TextDecoder('utf-8', { fatal: false });
 
     backendProcess.once('spawn', () => {
       logLine(`[backend] spawned pid=${backendProcess.pid} in ${Date.now() - launchStartedAt}ms`);
@@ -350,14 +376,14 @@ function startBackend({ port, envFile, dbPath, logDir }) {
         firstStdoutLogged = true;
         logLine(`[backend] first stdout after ${Date.now() - launchStartedAt}ms`);
       }
-      logLine(`[backend] ${String(data).trim()}`);
+      logLine(`[backend] ${decodeBackendOutput(data, stdoutDecoder)}`);
     });
     backendProcess.stderr.on('data', (data) => {
       if (!firstStderrLogged) {
         firstStderrLogged = true;
         logLine(`[backend] first stderr after ${Date.now() - launchStartedAt}ms`);
       }
-      logLine(`[backend] ${String(data).trim()}`);
+      logLine(`[backend] ${decodeBackendOutput(data, stderrDecoder)}`);
     });
     backendProcess.on('exit', (code, signal) => {
       logLine(`[backend] exited with code ${code}, signal ${signal || 'none'}`);

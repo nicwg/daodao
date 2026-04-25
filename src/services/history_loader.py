@@ -10,13 +10,14 @@ from __future__ import annotations
 
 import contextvars
 import logging
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from threading import Lock
-from typing import Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 import pandas as pd
 
 logger = logging.getLogger(__name__)
+_CACHE_MIN_RECORDS = 30
 
 # ---------------------------------------------------------------------------
 # Frozen target date (ContextVar) – set once per stock in pipeline, read by
@@ -59,6 +60,69 @@ def _get_fetcher_manager():
 # ---------------------------------------------------------------------------
 # DB-first history loader
 # ---------------------------------------------------------------------------
+def _history_code_candidates(stock_code: str) -> Tuple[List[str], str]:
+    from data_provider.base import canonical_stock_code, normalize_stock_code
+
+    raw_code = str(stock_code or "").strip()
+    normalized_code = canonical_stock_code(normalize_stock_code(raw_code))
+    candidates: List[str] = []
+    for candidate in (canonical_stock_code(raw_code), normalized_code):
+        if candidate and candidate not in candidates:
+            candidates.append(candidate)
+    return candidates, normalized_code
+
+
+def _coerce_bar_date(value: Any) -> date:
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    if isinstance(value, str):
+        try:
+            return datetime.strptime(value[:10], "%Y-%m-%d").date()
+        except ValueError:
+            return date.min
+    if hasattr(value, "date"):
+        try:
+            coerced = value.date()
+            return coerced if isinstance(coerced, date) else date.min
+        except Exception:
+            return date.min
+    return date.min
+
+
+def _bar_date(bar: Any) -> date:
+    row_date = _coerce_bar_date(getattr(bar, "date", None))
+    if row_date != date.min:
+        return row_date
+    if hasattr(bar, "to_dict"):
+        try:
+            return _coerce_bar_date((bar.to_dict() or {}).get("date"))
+        except Exception:
+            return date.min
+    return date.min
+
+
+def _select_best_bars(db, stock_code: str, start: date, end: date) -> Tuple[Optional[str], list]:
+    candidates, normalized_code = _history_code_candidates(stock_code)
+    best_code = None
+    best_bars = []
+    best_key = None
+
+    for candidate in candidates:
+        bars = list(db.get_data_range(candidate, start, end) or [])
+        if not bars:
+            continue
+        latest_date = max(_bar_date(bar) for bar in bars)
+        key = (latest_date, len(bars), candidate == normalized_code)
+        if best_key is None or key > best_key:
+            best_key = key
+            best_code = candidate
+            best_bars = bars
+
+    return best_code, best_bars
+
+
 def load_history_df(
     stock_code: str,
     days: int = 60,
@@ -70,7 +134,6 @@ def load_history_df(
     actual provider name on network fallback.  Returns ``(None, "none")`` when
     both paths fail.
     """
-    from data_provider.base import canonical_stock_code, normalize_stock_code
     from src.storage import get_db
 
     # Resolve effective end date
@@ -84,15 +147,12 @@ def load_history_df(
     start = end - timedelta(days=int(days * 1.8) + 10)
 
     # --- 1. DB lookup (canonical code, then prefix-stripped fallback) ------
-    code = canonical_stock_code(stock_code)
     try:
         db = get_db()
-        bars = db.get_data_range(code, start, end)
-        if not bars:
-            alt = normalize_stock_code(stock_code)
-            if alt != code:
-                bars = db.get_data_range(alt, start, end)
-        if bars and len(bars) >= max(int(days * 0.3), 5):
+        _code, bars = _select_best_bars(db, stock_code, start, end)
+        required_records = max(min(days, _CACHE_MIN_RECORDS), 1)
+        latest_date = max((_bar_date(bar) for bar in bars), default=date.min)
+        if bars and latest_date >= end and len(bars) >= required_records:
             df = pd.DataFrame([b.to_dict() for b in bars])
             logger.debug(
                 "load_history_df(%s): %d bars from DB (requested %d)",

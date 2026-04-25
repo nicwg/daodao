@@ -151,6 +151,16 @@ model_list:
 
 > **Priority Rule**: YAML is king! If YAML is configured, both **Channels Mode** and **Simple Mode** are entirely ignored. Hierarchy: `YAML > Channels > Simple`.
 
+### GitHub Actions Notes
+
+The bundled `daily_analysis.yml` explicitly passes the common LLM runtime fields to the job environment:
+
+- Runtime selection: `LLM_CHANNELS`, `LITELLM_MODEL`, `LITELLM_FALLBACK_MODELS`, `AGENT_LITELLM_MODEL`, `VISION_MODEL`, `VISION_PROVIDER_PRIORITY`, `LLM_TEMPERATURE`
+- Multiple keys: `GEMINI_API_KEYS`, `ANTHROPIC_API_KEYS`, `OPENAI_API_KEYS`, `DEEPSEEK_API_KEYS` (the current workflow imports these from repository Secrets only, not from same-named Variables)
+- Common channel names: `primary`, `secondary`, `gemini`, `deepseek`, `aihubmix`, `openai`, `anthropic`, `moonshot`, `ollama`
+
+For example, if you set `LLM_CHANNELS=primary,deepseek` in GitHub Actions, also configure the corresponding `LLM_PRIMARY_*` and `LLM_DEEPSEEK_*` entries. The `LLM_<NAME>_API_KEY` / `LLM_<NAME>_API_KEYS` fields are also imported from repository Secrets only right now, so storing them in Variables will not work at runtime. If you use a custom channel name such as `my_proxy`, GitHub Actions must explicitly add matching `LLM_MY_PROXY_*` mappings in the workflow `env:` block. Local `.env` and Docker runs do not have this limitation.
+
 ---
 
 ## Advanced Feature: Vision Model Config

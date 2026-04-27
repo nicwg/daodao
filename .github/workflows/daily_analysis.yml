@@ -192,6 +192,7 @@ jobs:
           # ==========================================
           # 搜索服务
           # ==========================================
+          ANSPIRE_API_KEYS: ${{ secrets.ANSPIRE_API_KEYS }} 
           BOCHA_API_KEYS: ${{ secrets.BOCHA_API_KEYS }}
           TAVILY_API_KEYS: ${{ secrets.TAVILY_API_KEYS }}
           SERPAPI_API_KEYS: ${{ secrets.SERPAPI_API_KEYS }}

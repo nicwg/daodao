@@ -209,13 +209,13 @@ PROXY_PORT=10809
 ```bash
 # 不需要配置 GEMINI_API_KEY
 OPENAI_API_KEY=sk-xxxxxxxx
-OPENAI_BASE_URL=https://api.deepseek.com/v1
-OPENAI_MODEL=deepseek-chat
-# 思考模式：deepseek-reasoner、deepseek-r1、qwq 等自动识别；deepseek-chat 系统按模型名自动启用
+OPENAI_BASE_URL=https://api.deepseek.com
+OPENAI_MODEL=deepseek-v4-flash
+# deepseek-chat / deepseek-reasoner 仍兼容，但官方已标记为 2026/07/24 后废弃
 ```
 
 支持的模型服务：
-- DeepSeek: `https://api.deepseek.com/v1`
+- DeepSeek: `https://api.deepseek.com`
 - 通义千问: `https://dashscope.aliyuncs.com/compatible-mode/v1`
 - Moonshot: `https://api.moonshot.cn/v1`
 

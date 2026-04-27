@@ -207,13 +207,13 @@ Use channel mode: set `LLM_CHANNELS=aihubmix,deepseek,gemini` and configure each
 ```bash
 # No need to configure GEMINI_API_KEY
 OPENAI_API_KEY=sk-xxxxxxxx
-OPENAI_BASE_URL=https://api.deepseek.com/v1
-OPENAI_MODEL=deepseek-chat
-# Thinking mode: deepseek-reasoner, deepseek-r1, qwq auto-detected; deepseek-chat enabled by model name
+OPENAI_BASE_URL=https://api.deepseek.com
+OPENAI_MODEL=deepseek-v4-flash
+# deepseek-chat / deepseek-reasoner remain compatible, but DeepSeek marks them deprecated after 2026/07/24
 ```
 
 Supported model services:
-- DeepSeek: `https://api.deepseek.com/v1`
+- DeepSeek: `https://api.deepseek.com`
 - Qwen (Tongyi Qianwen): `https://dashscope.aliyuncs.com/compatible-mode/v1`
 - Moonshot: `https://api.moonshot.cn/v1`
 

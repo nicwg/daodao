@@ -4,102 +4,12 @@ import type { ParsedApiError } from '../../api/error';
 import { getParsedApiError } from '../../api/error';
 import { systemConfigApi } from '../../api/systemConfig';
 import { ApiErrorAlert, Badge, Button, InlineAlert, Input, Select, StatusDot, Tooltip } from '../common';
-
-type ChannelProtocol = 'openai' | 'deepseek' | 'gemini' | 'anthropic' | 'vertex_ai' | 'ollama';
-
-interface ChannelPreset {
-  label: string;
-  protocol: ChannelProtocol;
-  baseUrl: string;
-  placeholder: string;
-}
-
-const CHANNEL_PRESETS: Record<string, ChannelPreset> = {
-  aihubmix: {
-    label: 'AIHubmix（聚合平台）',
-    protocol: 'openai',
-    baseUrl: 'https://aihubmix.com/v1',
-    placeholder: 'gpt-5.5,claude-sonnet-4-6,gemini-3.1-pro-preview',
-  },
-  deepseek: {
-    label: 'DeepSeek 官方',
-    protocol: 'deepseek',
-    baseUrl: 'https://api.deepseek.com',
-    placeholder: 'deepseek-v4-flash,deepseek-v4-pro',
-  },
-  dashscope: {
-    label: '通义千问（Dashscope）',
-    protocol: 'openai',
-    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-    placeholder: 'qwen3.6-plus,qwen3.6-flash',
-  },
-  zhipu: {
-    label: '智谱 GLM',
-    protocol: 'openai',
-    baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
-    placeholder: 'glm-5.1,glm-4.7-flash',
-  },
-  moonshot: {
-    label: 'Moonshot（月之暗面）',
-    protocol: 'openai',
-    baseUrl: 'https://api.moonshot.cn/v1',
-    placeholder: 'kimi-k2.6,kimi-k2.5',
-  },
-  minimax: {
-    label: 'MiniMax 官方',
-    protocol: 'openai',
-    baseUrl: 'https://api.minimax.io/v1',
-    placeholder: 'MiniMax-M2.7,MiniMax-M2.7-highspeed',
-  },
-  volcengine: {
-    label: '火山方舟（豆包）',
-    protocol: 'openai',
-    baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
-    placeholder: 'doubao-seed-1-6-251015,doubao-seed-1-6-thinking-251015',
-  },
-  siliconflow: {
-    label: '硅基流动（SiliconFlow）',
-    protocol: 'openai',
-    baseUrl: 'https://api.siliconflow.cn/v1',
-    placeholder: 'deepseek-ai/DeepSeek-V3.2,Qwen/Qwen3-235B-A22B-Thinking-2507',
-  },
-  openrouter: {
-    label: 'OpenRouter',
-    protocol: 'openai',
-    baseUrl: 'https://openrouter.ai/api/v1',
-    placeholder: '~openai/gpt-latest,~anthropic/claude-sonnet-latest',
-  },
-  gemini: {
-    label: 'Gemini 官方',
-    protocol: 'gemini',
-    baseUrl: '',
-    placeholder: 'gemini-3.1-pro-preview,gemini-3-flash-preview',
-  },
-  anthropic: {
-    label: 'Anthropic 官方',
-    protocol: 'anthropic',
-    baseUrl: '',
-    placeholder: 'claude-sonnet-4-6,claude-opus-4-7',
-  },
-  openai: {
-    label: 'OpenAI 官方',
-    protocol: 'openai',
-    baseUrl: 'https://api.openai.com/v1',
-    placeholder: 'gpt-5.5,gpt-5.4-mini',
-  },
-  ollama: {
-    label: 'Ollama（本地）',
-    protocol: 'ollama',
-    baseUrl: 'http://127.0.0.1:11434',
-    placeholder: 'llama3.2,qwen2.5',
-  },
-  custom: {
-    label: '自定义渠道',
-    protocol: 'openai',
-    baseUrl: '',
-    placeholder: 'model-name-1,model-name-2',
-  },
-};
+import type { ChannelProtocol } from './llmProviderTemplates';
+import {
+  LLM_PROVIDER_TEMPLATE_BY_ID,
+  LLM_PROVIDER_TEMPLATES,
+  MODEL_PLACEHOLDERS_BY_PROTOCOL,
+} from './llmProviderTemplates';
 
 const PROTOCOL_OPTIONS: Array<{ value: ChannelProtocol; label: string }> = [
   { value: 'openai', label: 'OpenAI Compatible' },
@@ -109,15 +19,6 @@ const PROTOCOL_OPTIONS: Array<{ value: ChannelProtocol; label: string }> = [
   { value: 'vertex_ai', label: 'Vertex AI' },
   { value: 'ollama', label: 'Ollama' },
 ];
-
-const MODEL_PLACEHOLDERS: Record<ChannelProtocol, string> = {
-  openai: 'gpt-5.5,qwen3.6-plus',
-  deepseek: 'deepseek-v4-flash,deepseek-v4-pro',
-  gemini: 'gemini-3.1-pro-preview,gemini-3-flash-preview',
-  anthropic: 'claude-sonnet-4-6,claude-opus-4-7',
-  vertex_ai: 'gemini-3.1-pro-preview',
-  ollama: 'llama3.2,qwen2.5',
-};
 
 const KNOWN_MODEL_PREFIXES = new Set([
   'openai',
@@ -215,7 +116,7 @@ const ChannelRow: React.FC<ChannelRowProps> = ({
   onTest,
   onDiscoverModels,
 }) => {
-  const preset = CHANNEL_PRESETS[channel.name];
+  const preset = LLM_PROVIDER_TEMPLATE_BY_ID[channel.name];
   const displayName = preset?.label || channel.name;
   const selectedModels = splitModels(channel.models);
   const discoveredModels = discoveryState?.models || [];
@@ -421,7 +322,7 @@ const ChannelRow: React.FC<ChannelRowProps> = ({
               value={channel.models}
               disabled={busy}
               onChange={(e) => onUpdate(index, 'models', e.target.value)}
-              placeholder={preset?.placeholder || MODEL_PLACEHOLDERS[channel.protocol]}
+              placeholder={preset?.placeholderModels || MODEL_PLACEHOLDERS_BY_PROTOCOL[channel.protocol]}
               hint={
                 discoveredModels.length > 0
                   ? '如有自定义模型名未出现在列表中，可继续手动补充，保存格式仍为逗号分隔。'
@@ -991,15 +892,15 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
       const updated = { ...channel, [field]: value };
 
       if (field === 'name' && typeof value === 'string') {
-        const newPreset = CHANNEL_PRESETS[value];
+        const newPreset = LLM_PROVIDER_TEMPLATE_BY_ID[value];
         if (newPreset) {
-          const oldPreset = CHANNEL_PRESETS[channel.name];
+          const oldPreset = LLM_PROVIDER_TEMPLATE_BY_ID[channel.name];
           if (!updated.baseUrl || updated.baseUrl === (oldPreset?.baseUrl ?? '')) {
             updated.baseUrl = newPreset.baseUrl;
           }
           updated.protocol = newPreset.protocol;
-          if (!updated.models || updated.models === (oldPreset?.placeholder ?? '')) {
-            updated.models = newPreset.placeholder;
+          if (!updated.models || updated.models === (oldPreset?.placeholderModels ?? '')) {
+            updated.models = newPreset.placeholderModels;
           }
         }
       }
@@ -1050,7 +951,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   };
 
   const addChannel = () => {
-    const preset = CHANNEL_PRESETS[addPreset] || CHANNEL_PRESETS.custom;
+    const preset = LLM_PROVIDER_TEMPLATE_BY_ID[addPreset] || LLM_PROVIDER_TEMPLATE_BY_ID.custom;
     setChannels((previous) => {
       const existingNames = new Set(previous.map((channel) => channel.name));
       const baseName = addPreset === 'custom' ? 'custom' : addPreset;
@@ -1069,7 +970,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
           protocol: preset.protocol,
           baseUrl: preset.baseUrl,
           apiKey: '',
-          models: preset.placeholder || '',
+          models: preset.placeholderModels || '',
           enabled: true,
         },
       ];
@@ -1313,8 +1214,8 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
               <Select
                 value={addPreset}
                 onChange={setAddPreset}
-                options={Object.entries(CHANNEL_PRESETS).map(([value, preset]) => ({
-                  value,
+                options={LLM_PROVIDER_TEMPLATES.map((preset) => ({
+                  value: preset.channelId,
                   label: preset.label,
                 }))}
                 disabled={busy}

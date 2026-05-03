@@ -146,6 +146,65 @@ describe('LLMChannelEditor', () => {
     expect(screen.getByLabelText('模型（逗号分隔）')).toHaveValue(models);
   });
 
+  it('preserves manually edited base URL and models when switching preset names', async () => {
+    render(
+      <LLMChannelEditor
+        items={[]}
+        configVersion="v1"
+        maskToken="******"
+        onSaved={() => {}}
+      />
+    );
+
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'deepseek' } });
+    fireEvent.click(screen.getByRole('button', { name: '+ 添加渠道' }));
+
+    await screen.findByRole('button', { name: /DeepSeek 官方/i });
+    fireEvent.change(screen.getByLabelText('Base URL'), {
+      target: { value: 'https://proxy.example.com/v1' },
+    });
+    fireEvent.change(screen.getByLabelText('模型（逗号分隔）'), {
+      target: { value: 'custom-model-a,custom-model-b' },
+    });
+    fireEvent.change(screen.getByLabelText('渠道名称'), {
+      target: { value: 'minimax' },
+    });
+
+    await screen.findByRole('button', { name: /MiniMax 官方/i });
+    expect(screen.getByLabelText('Base URL')).toHaveValue('https://proxy.example.com/v1');
+    expect(screen.getByLabelText('模型（逗号分隔）')).toHaveValue('custom-model-a,custom-model-b');
+  });
+
+  it('uses the selected preset defaults when adding a duplicate provider channel', async () => {
+    render(
+      <LLMChannelEditor
+        items={[]}
+        configVersion="v1"
+        maskToken="******"
+        onSaved={() => {}}
+      />
+    );
+
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'minimax' } });
+    fireEvent.click(screen.getByRole('button', { name: '+ 添加渠道' }));
+    await screen.findByRole('button', { name: /MiniMax 官方/i });
+    fireEvent.click(screen.getByRole('button', { name: '+ 添加渠道' }));
+
+    await screen.findByRole('button', { name: /minimax2/i });
+    expect(screen.getAllByLabelText('渠道名称').map((input) => (input as HTMLInputElement).value)).toEqual([
+      'minimax',
+      'minimax2',
+    ]);
+    expect(screen.getAllByLabelText('Base URL').map((input) => (input as HTMLInputElement).value)).toEqual([
+      'https://api.minimax.io/v1',
+      'https://api.minimax.io/v1',
+    ]);
+    expect(screen.getAllByLabelText('模型（逗号分隔）').map((input) => (input as HTMLInputElement).value)).toEqual([
+      'MiniMax-M2.7,MiniMax-M2.7-highspeed',
+      'MiniMax-M2.7,MiniMax-M2.7-highspeed',
+    ]);
+  });
+
   it('saves the MiniMax preset into LLM channel env keys', async () => {
     update.mockResolvedValue({
       success: true,

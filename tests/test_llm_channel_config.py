@@ -133,7 +133,7 @@ class LLMChannelConfigTestCase(unittest.TestCase):
         with patch.dict(os.environ, env, clear=True):
             config = Config._load_from_env()
 
-        self.assertEqual(config.litellm_model, "gemini/gemini-3-flash-preview")
+        self.assertEqual(config.litellm_model, "gemini/gemini-3.1-pro-preview")
         self.assertAlmostEqual(config.llm_temperature, 0.15)
 
     @patch("src.config.setup_env")

@@ -19,7 +19,7 @@ const CHANNEL_PRESETS: Record<string, ChannelPreset> = {
     label: 'AIHubmix（聚合平台）',
     protocol: 'openai',
     baseUrl: 'https://aihubmix.com/v1',
-    placeholder: 'gpt-4o-mini,claude-3-5-sonnet,qwen-plus',
+    placeholder: 'gpt-5.5,claude-sonnet-4-6,gemini-3.1-pro-preview',
   },
   deepseek: {
     label: 'DeepSeek 官方',
@@ -31,49 +31,61 @@ const CHANNEL_PRESETS: Record<string, ChannelPreset> = {
     label: '通义千问（Dashscope）',
     protocol: 'openai',
     baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-    placeholder: 'qwen-plus,qwen-turbo',
+    placeholder: 'qwen3.6-plus,qwen3.6-flash',
   },
   zhipu: {
     label: '智谱 GLM',
     protocol: 'openai',
     baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
-    placeholder: 'glm-4-flash,glm-4-plus',
+    placeholder: 'glm-5.1,glm-4.7-flash',
   },
   moonshot: {
     label: 'Moonshot（月之暗面）',
     protocol: 'openai',
     baseUrl: 'https://api.moonshot.cn/v1',
-    placeholder: 'moonshot-v1-8k',
+    placeholder: 'kimi-k2.6,kimi-k2.5',
+  },
+  minimax: {
+    label: 'MiniMax 官方',
+    protocol: 'openai',
+    baseUrl: 'https://api.minimax.io/v1',
+    placeholder: 'MiniMax-M2.7,MiniMax-M2.7-highspeed',
+  },
+  volcengine: {
+    label: '火山方舟（豆包）',
+    protocol: 'openai',
+    baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+    placeholder: 'doubao-seed-1-6-251015,doubao-seed-1-6-thinking-251015',
   },
   siliconflow: {
     label: '硅基流动（SiliconFlow）',
     protocol: 'openai',
     baseUrl: 'https://api.siliconflow.cn/v1',
-    placeholder: 'Qwen/Qwen3-8B,deepseek-ai/DeepSeek-V3',
+    placeholder: 'deepseek-ai/DeepSeek-V3.2,Qwen/Qwen3-235B-A22B-Thinking-2507',
   },
   openrouter: {
     label: 'OpenRouter',
     protocol: 'openai',
     baseUrl: 'https://openrouter.ai/api/v1',
-    placeholder: 'openai/gpt-4o,anthropic/claude-3-5-sonnet',
+    placeholder: '~openai/gpt-latest,~anthropic/claude-sonnet-latest',
   },
   gemini: {
     label: 'Gemini 官方',
     protocol: 'gemini',
     baseUrl: '',
-    placeholder: 'gemini-2.5-flash,gemini-2.5-pro',
+    placeholder: 'gemini-3.1-pro-preview,gemini-3-flash-preview',
   },
   anthropic: {
     label: 'Anthropic 官方',
     protocol: 'anthropic',
     baseUrl: '',
-    placeholder: 'claude-3-5-sonnet-20241022',
+    placeholder: 'claude-sonnet-4-6,claude-opus-4-7',
   },
   openai: {
     label: 'OpenAI 官方',
     protocol: 'openai',
     baseUrl: 'https://api.openai.com/v1',
-    placeholder: 'gpt-4o,gpt-4o-mini',
+    placeholder: 'gpt-5.5,gpt-5.4-mini',
   },
   ollama: {
     label: 'Ollama（本地）',
@@ -99,11 +111,11 @@ const PROTOCOL_OPTIONS: Array<{ value: ChannelProtocol; label: string }> = [
 ];
 
 const MODEL_PLACEHOLDERS: Record<ChannelProtocol, string> = {
-  openai: 'gpt-4o-mini,qwen-plus',
+  openai: 'gpt-5.5,qwen3.6-plus',
   deepseek: 'deepseek-v4-flash,deepseek-v4-pro',
-  gemini: 'gemini-2.5-flash,gemini-2.5-pro',
-  anthropic: 'claude-3-5-sonnet-20241022',
-  vertex_ai: 'gemini-2.5-flash',
+  gemini: 'gemini-3.1-pro-preview,gemini-3-flash-preview',
+  anthropic: 'claude-sonnet-4-6,claude-opus-4-7',
+  vertex_ai: 'gemini-3.1-pro-preview',
   ollama: 'llama3.2,qwen2.5',
 };
 
@@ -146,11 +158,13 @@ interface ChannelConfig {
 interface ChannelTestState {
   status: 'idle' | 'loading' | 'success' | 'error';
   text?: string;
+  hint?: string;
 }
 
 interface ChannelDiscoveryState {
   status: 'idle' | 'loading' | 'success' | 'error';
   text?: string;
+  hint?: string;
   models: string[];
 }
 
@@ -374,6 +388,11 @@ const ChannelRow: React.FC<ChannelRowProps> = ({
                 {discoveryState?.text || '支持 `/models` 的 OpenAI Compatible 渠道可自动拉取模型。'}
               </span>
             </div>
+            {discoveryState?.hint ? (
+              <p className="text-[11px] text-secondary-text">
+                {discoveryState.hint}
+              </p>
+            ) : null}
 
             {discoveredModels.length > 0 ? (
               <div>
@@ -429,16 +448,23 @@ const ChannelRow: React.FC<ChannelRowProps> = ({
               {testState?.status === 'loading' ? '测试中...' : '测试连接'}
             </Button>
             {testState?.text ? (
-              <span className={`text-xs ${
-                testState.status === 'success'
-                  ? 'text-success'
-                  : testState.status === 'error'
-                    ? 'text-danger'
-                    : 'text-muted-text'
-              }`}
-              >
-                {testState.text}
-              </span>
+              <div className="space-y-1">
+                <span className={`block text-xs ${
+                  testState.status === 'success'
+                    ? 'text-success'
+                    : testState.status === 'error'
+                      ? 'text-danger'
+                      : 'text-muted-text'
+                }`}
+                >
+                  {testState.text}
+                </span>
+                {testState.hint ? (
+                  <p className="text-[11px] text-secondary-text">
+                    {testState.hint}
+                  </p>
+                ) : null}
+              </div>
             ) : null}
           </div>
         </div>
@@ -607,6 +633,73 @@ function buildModelOptions(models: string[], selectedModel: string, autoLabel: s
     options.push({ value: model, label: model });
   }
   return options;
+}
+
+const LLM_STAGE_LABELS: Record<string, string> = {
+  model_discovery: '模型发现',
+  chat_completion: '聊天调用',
+  response_parse: '响应解析',
+};
+
+const LLM_ERROR_LABELS: Record<string, string> = {
+  auth: '鉴权失败',
+  timeout: '请求超时',
+  quota: '额度或限流',
+  model_not_found: '模型不存在',
+  empty_response: '空响应',
+  format_error: '格式异常',
+  network_error: '网络异常',
+  invalid_config: '配置无效',
+  unsupported_protocol: '协议暂不支持',
+};
+
+const LLM_TROUBLESHOOTING_HINTS: Record<string, string> = {
+  auth: '请检查 API Key 是否正确、是否有多余空格，以及当前渠道是否需要额外组织/项目权限。',
+  timeout: '可重试；若持续超时，请检查 Base URL、网络代理、服务商可用区或本地防火墙。',
+  quota: '请检查余额、套餐额度、RPM/TPM 限流或并发设置，必要时稍后重试。',
+  model_not_found: '请确认模型名与渠道协议匹配，并先用“获取模型”核对该渠道实际可用模型列表。',
+  empty_response: '渠道已连通但未返回正文；可尝试切换兼容模型、关闭额外响应模式后再测试。',
+  network_error: '请检查 Base URL、代理、TLS/证书、中转网关或本地网络策略，并可稍后重试。',
+  invalid_config: '先补齐协议、Base URL、API Key 和模型配置，再执行一键测试。',
+  unsupported_protocol: '当前仅对 OpenAI Compatible / DeepSeek 渠道提供自动模型发现，请改为手动维护模型列表。',
+};
+
+function getLlmStageLabel(stage?: string | null): string {
+  return LLM_STAGE_LABELS[stage || ''] || '连接测试';
+}
+
+function getLlmErrorCodeLabel(code?: string | null): string {
+  return LLM_ERROR_LABELS[code || ''] || '测试失败';
+}
+
+function getLlmTroubleshootingHint(
+  code?: string | null,
+  stage?: string | null,
+  context: 'test' | 'discovery' = 'test',
+): string | undefined {
+  if (code === 'format_error') {
+    return context === 'discovery' || stage === 'model_discovery'
+      ? '该渠道返回的 /models 响应格式不兼容，请改为手动填写模型列表。'
+      : '返回结构与预期不一致，请确认该渠道兼容 Chat Completions 接口。';
+  }
+  if (code === 'empty_response' && (context === 'discovery' || stage === 'model_discovery')) {
+    return '该渠道的 /models 接口未返回可用模型 ID；请检查 Base URL 是否指向兼容的模型列表接口，或改为手动填写模型列表。';
+  }
+  return LLM_TROUBLESHOOTING_HINTS[code || ''];
+}
+
+function buildLlmFailureText(result: {
+  message: string;
+  error?: string | null;
+  stage?: string | null;
+  errorCode?: string | null;
+}): string {
+  const prefix = `${getLlmStageLabel(result.stage)} · ${getLlmErrorCodeLabel(result.errorCode)}`;
+  const summary = result.message || '测试失败';
+  if (result.error && result.error !== result.message) {
+    return `${prefix}：${summary}（原始摘要：${result.error}）`;
+  }
+  return `${prefix}：${summary}`;
 }
 
 const MANAGED_PROVIDERS = new Set(['gemini', 'vertex_ai', 'anthropic', 'openai', 'deepseek']);
@@ -815,6 +908,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     | { type: 'local-error'; text: string }
     | null
   >(null);
+  const [saveWarnings, setSaveWarnings] = useState<string[]>([]);
   const [visibleKeys, setVisibleKeys] = useState<Record<number, boolean>>({});
   const [testStates, setTestStates] = useState<Record<number, ChannelTestState>>({});
   const [discoveryStates, setDiscoveryStates] = useState<Record<string, ChannelDiscoveryState>>({});
@@ -825,6 +919,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
 
   const prevChannelsRef = useRef(channelsFingerprint);
   const prevRuntimeRef = useRef(runtimeFingerprint);
+  const pendingSaveFeedbackFingerprintRef = useRef<{ channels: string; runtime: string } | null>(null);
   const discoveryNonceRef = useRef<Record<string, number>>({});
   const discoveryRequestIdRef = useRef(0);
 
@@ -834,6 +929,10 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     }
     prevChannelsRef.current = channelsFingerprint;
     prevRuntimeRef.current = runtimeFingerprint;
+    const pendingSaveFeedbackFingerprint = pendingSaveFeedbackFingerprintRef.current;
+    const preserveSaveFeedback = pendingSaveFeedbackFingerprint?.channels === channelsFingerprint
+      && pendingSaveFeedbackFingerprint.runtime === runtimeFingerprint;
+    pendingSaveFeedbackFingerprintRef.current = null;
     setChannels(initialChannels);
     setRuntimeConfig(initialRuntimeConfig);
     setVisibleKeys({});
@@ -841,7 +940,10 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     setDiscoveryStates({});
     setExpandedRows({});
     discoveryNonceRef.current = {};
-    setSaveMessage(null);
+    if (!preserveSaveFeedback) {
+      setSaveMessage(null);
+      setSaveWarnings([]);
+    }
     setIsCollapsed(false);
   }, [channelsFingerprint, runtimeFingerprint, initialChannels, initialRuntimeConfig]);
 
@@ -1029,18 +1131,26 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
 
     setIsSaving(true);
     setSaveMessage(null);
+    setSaveWarnings([]);
 
     try {
       const updateItems = channelsToUpdateItems(channels, initialNames, runtimeConfigForSave, managesRuntimeConfig);
-      await systemConfigApi.update({
+      const response = await systemConfigApi.update({
         configVersion,
         maskToken,
         reloadNow: true,
         items: updateItems,
       });
-      setSaveMessage({ type: 'success', text: managesRuntimeConfig ? 'AI 配置已保存' : '渠道配置已保存' });
+      const responseWarnings = response.warnings || [];
       await onSaved(updateItems);
+      pendingSaveFeedbackFingerprintRef.current = {
+        channels: JSON.stringify(parseChannelsFromItems(updateItems)),
+        runtime: JSON.stringify(parseRuntimeConfigFromItems(updateItems)),
+      };
+      setSaveWarnings(responseWarnings);
+      setSaveMessage({ type: 'success', text: managesRuntimeConfig ? 'AI 配置已保存' : '渠道配置已保存' });
     } catch (error: unknown) {
+      setSaveWarnings([]);
       setSaveMessage({ type: 'error', error: getParsedApiError(error) });
     } finally {
       setIsSaving(false);
@@ -1065,13 +1175,15 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
 
       const text = result.success
         ? `连接成功${result.resolvedModel ? ` · ${result.resolvedModel}` : ''}${result.latencyMs ? ` · ${result.latencyMs} ms` : ''}`
-        : (result.error || result.message || '测试失败');
+        : buildLlmFailureText(result);
+      const hint = result.success ? undefined : getLlmTroubleshootingHint(result.errorCode, result.stage, 'test');
 
       setTestStates((previous) => ({
         ...previous,
         [index]: {
           status: result.success ? 'success' : 'error',
           text,
+          hint,
         },
       }));
     } catch (error: unknown) {
@@ -1094,6 +1206,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
       [channel.id]: {
         status: 'loading',
         text: '正在获取模型列表...',
+        hint: undefined,
         models: previous[channel.id]?.models || [],
       },
     }));
@@ -1115,7 +1228,8 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
           status: result.success ? 'success' : 'error',
           text: result.success
             ? `已获取 ${result.models.length} 个模型${result.latencyMs ? ` · ${result.latencyMs} ms` : ''}`
-            : (result.error || result.message || '获取模型失败'),
+            : buildLlmFailureText(result),
+          hint: result.success ? undefined : getLlmTroubleshootingHint(result.errorCode, result.stage, 'discovery'),
           models: result.success ? result.models : (previous[channel.id]?.models || []),
         },
       }));
@@ -1128,6 +1242,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
         [channel.id]: {
           status: 'error',
           text: parsed.message || '获取模型失败',
+          hint: undefined,
           models: previous[channel.id]?.models || [],
         },
       }));
@@ -1364,6 +1479,21 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
             <InlineAlert
               variant="success"
               message={saveMessage.text}
+              className="rounded-lg px-3 py-2 text-sm shadow-none"
+            />
+          ) : null}
+
+          {saveWarnings.length > 0 ? (
+            <InlineAlert
+              variant="warning"
+              title="保存后提示"
+              message={(
+                <div className="space-y-1">
+                  {saveWarnings.map((warning) => (
+                    <p key={warning}>{warning}</p>
+                  ))}
+                </div>
+              )}
               className="rounded-lg px-3 py-2 text-sm shadow-none"
             />
           ) : null}

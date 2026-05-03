@@ -41,7 +41,7 @@ English | [简体中文](../README.md) | [繁體中文](README_CHT.md)
 | Analysis | Multi-dimensional Analysis | Technicals, realtime quotes, chip distribution, news sentiment, announcements, capital flow, and fundamentals |
 | Market | Global Markets | A-shares, Hong Kong stocks, US stocks, US indices, and common ETFs |
 | Strategy | Market Strategy System | A-share review, US regime strategy, moving averages, Chan theory, Elliott wave, and sentiment-cycle support |
-| Review | Market Review | Daily market overview, index performance, breadth, and sector strength |
+| Review | Market Review | Daily market overview, index performance, breadth, and sector strength (supports cn / hk / us / both) |
 | Web | Dual-theme Workspace | Manual analysis, settings, task progress, history, backtest, and portfolio management |
 | Import | Smart Import & Autocomplete | Image, CSV/Excel, and clipboard import; search by code, name, pinyin, and aliases |
 | History | Report Management | Full Markdown reports, rerun analysis, history browsing, and batch management |
@@ -232,6 +232,13 @@ After configuring any available AI API key, the Web `/chat` page can use strateg
 - Supports custom strategy files and experimental multi-agent orchestration
 
 > Agent parameters, `skill` naming compatibility, multi-agent mode, and budget guards are covered in the [Full Guide](./full-guide_EN.md#local-webui-management-interface) and [LLM Config Guide](./LLM_CONFIG_GUIDE_EN.md).
+
+## Related Projects
+
+DSA focuses on daily analysis reports. These sibling projects cover stock screening, strategy validation, and strategy evolution for users who want to extend the workflow. They are maintained independently today, with candidate import, backtest validation, and report handoff planned as future integration directions.
+
+- [AlphaSift](https://github.com/ZhuLinsen/alphasift): multi-factor stock screening and full-market scanning for building candidate watchlists.
+- [AlphaEvo](https://github.com/ZhuLinsen/alphaevo): strategy backtesting and self-evolution experiments for validating rules and iteratively exploring strategy parameters and combinations.
 
 ## 🗺️ Roadmap
 

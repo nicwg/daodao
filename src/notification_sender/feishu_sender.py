@@ -233,7 +233,7 @@ class FeishuSender:
                 "header": {
                     "title": {
                         "tag": "plain_text",
-                        "content": "A股智能分析报告"
+                        "content": "股票智能分析报告"
                     }
                 },
                 "elements": [

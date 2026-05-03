@@ -822,7 +822,14 @@ class StockAnalysisPipeline:
             agent_result = executor.run(message, context=initial_context)
 
             # 转换为 AnalysisResult
-            result = self._agent_result_to_analysis_result(agent_result, code, stock_name, report_type, query_id)
+            result = self._agent_result_to_analysis_result(
+                agent_result,
+                code,
+                stock_name,
+                report_type,
+                query_id,
+                trend_result=trend_result,
+            )
             if result:
                 result.query_id = query_id
             # Agent weak integrity: placeholder fill only, no LLM retry
@@ -892,7 +899,13 @@ class StockAnalysisPipeline:
             return None
 
     def _agent_result_to_analysis_result(
-        self, agent_result, code: str, stock_name: str, report_type: ReportType, query_id: str
+        self,
+        agent_result,
+        code: str,
+        stock_name: str,
+        report_type: ReportType,
+        query_id: str,
+        trend_result: Optional[TrendAnalysisResult] = None,
     ) -> AnalysisResult:
         """
         将 AgentResult 转换为 AnalysisResult。
@@ -952,12 +965,56 @@ class StockAnalysisPipeline:
             # structure, so we unwrap it here.
             result.dashboard = dash.get("dashboard") or dash
         else:
-            result.sentiment_score = 50
-            result.operation_advice = "Watch" if report_language == "en" else "观望"
+            self._apply_trend_fallback(result, trend_result, report_language)
             if not result.error_message:
                 result.error_message = "Agent failed to generate a valid decision dashboard" if report_language == "en" else "Agent 未能生成有效的决策仪表盘"
 
         return result
+
+    @staticmethod
+    def _apply_trend_fallback(
+        result: AnalysisResult,
+        trend_result: Optional[TrendAnalysisResult],
+        report_language: str,
+    ) -> None:
+        if trend_result is None:
+            result.sentiment_score = 50
+            result.operation_advice = "Watch" if report_language == "en" else "观望"
+            return
+
+        score = getattr(trend_result, "signal_score", None)
+        try:
+            numeric_score = int(score)
+        except (TypeError, ValueError):
+            numeric_score = 50
+        result.sentiment_score = numeric_score if numeric_score > 0 else 50
+
+        trend_status = getattr(trend_result, "trend_status", None)
+        trend_label = getattr(trend_status, "value", None) or str(trend_status or "").strip()
+        if trend_label:
+            result.trend_prediction = trend_label
+
+        buy_signal = getattr(trend_result, "buy_signal", None)
+        signal_label = getattr(buy_signal, "value", None) or str(buy_signal or "").strip()
+        if signal_label:
+            result.operation_advice = signal_label
+        else:
+            result.operation_advice = "Watch" if report_language == "en" else "观望"
+
+        from src.agent.protocols import normalize_decision_signal
+
+        signal_name = getattr(buy_signal, "name", "").lower()
+        signal_to_decision = {
+            "strong_buy": "buy",
+            "buy": "buy",
+            "hold": "hold",
+            "wait": "hold",
+            "sell": "sell",
+            "strong_sell": "sell",
+        }
+        result.decision_type = signal_to_decision.get(signal_name, result.decision_type or "hold")
+        result.decision_type = normalize_decision_signal(result.decision_type)
+        result.data_sources = f"{result.data_sources},trend:fallback" if result.data_sources else "trend:fallback"
 
     @staticmethod
     def _is_placeholder_stock_name(name: str, code: str) -> bool:

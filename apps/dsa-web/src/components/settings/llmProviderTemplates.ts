@@ -1,4 +1,11 @@
 export type ChannelProtocol = 'openai' | 'deepseek' | 'gemini' | 'anthropic' | 'vertex_ai' | 'ollama';
+export type LLMProviderCapability =
+  | 'openai-compatible'
+  | 'aggregator'
+  | 'official-api'
+  | 'model-discovery'
+  | 'vision'
+  | 'local-runtime';
 
 export interface LLMProviderTemplate {
   channelId: string;
@@ -6,12 +13,40 @@ export interface LLMProviderTemplate {
   protocol: ChannelProtocol;
   baseUrl: string;
   placeholderModels: string;
-  capabilities: string[];
+  capabilities: LLMProviderCapability[];
+  configHint?: string;
   officialSources: Array<{
     label: string;
     url: string;
   }>;
 }
+
+export const LLM_PROVIDER_CAPABILITY_LABELS: Record<LLMProviderCapability, { label: string; hint: string }> = {
+  'openai-compatible': {
+    label: 'OpenAI 兼容',
+    hint: '按 OpenAI-compatible endpoint 配置 Base URL，不额外拼接 /chat/completions。',
+  },
+  aggregator: {
+    label: '聚合平台',
+    hint: '模型可见性、路由和价格可能随账号权限与平台策略变化。',
+  },
+  'official-api': {
+    label: '官方 API',
+    hint: '使用服务商官方协议或官方兼容入口。',
+  },
+  'model-discovery': {
+    label: '可获取模型',
+    hint: '支持尝试通过 /models 获取模型列表；实际结果仍取决于账号权限和 API Key。',
+  },
+  vision: {
+    label: 'Vision 提示',
+    hint: '模板提示该 provider 常用于 Vision 场景；具体模型能力仍以账号和模型列表为准。',
+  },
+  'local-runtime': {
+    label: '本地运行',
+    hint: '需要当前运行环境能访问对应本地服务。',
+  },
+};
 
 export const LLM_PROVIDER_TEMPLATES: LLMProviderTemplate[] = [
   {
@@ -80,6 +115,7 @@ export const LLM_PROVIDER_TEMPLATES: LLMProviderTemplate[] = [
     baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
     placeholderModels: 'doubao-seed-1-6-251015,doubao-seed-1-6-thinking-251015',
     capabilities: ['openai-compatible'],
+    configHint: '确认在线推理 endpoint / region 与 Coding Plan 专用入口不要混用。',
     officialSources: [
       { label: 'Volcengine Ark Inference', url: 'https://www.volcengine.com/docs/82379/2121998' },
       { label: 'Volcengine Ark Models', url: 'https://www.volcengine.com/docs/82379/1949118' },
@@ -92,6 +128,7 @@ export const LLM_PROVIDER_TEMPLATES: LLMProviderTemplate[] = [
     baseUrl: 'https://api.siliconflow.cn/v1',
     placeholderModels: 'deepseek-ai/DeepSeek-V3.2,Qwen/Qwen3-235B-A22B-Thinking-2507',
     capabilities: ['openai-compatible', 'model-discovery'],
+    configHint: '模型列表和模型可见性依赖账号权限与 API Key。',
     officialSources: [{ label: 'SiliconFlow Models', url: 'https://docs.siliconflow.cn/quickstart/models' }],
   },
   {
@@ -99,8 +136,9 @@ export const LLM_PROVIDER_TEMPLATES: LLMProviderTemplate[] = [
     label: 'OpenRouter',
     protocol: 'openai',
     baseUrl: 'https://openrouter.ai/api/v1',
-    placeholderModels: '~openai/gpt-latest,~anthropic/claude-sonnet-latest',
+    placeholderModels: '~anthropic/claude-sonnet-latest,~openai/gpt-latest',
     capabilities: ['openai-compatible', 'aggregator', 'model-discovery'],
+    configHint: '模型列表和模型可见性依赖账号权限与 API Key。',
     officialSources: [
       { label: 'OpenRouter Models API', url: 'https://openrouter.ai/docs/api/api-reference/models/get-models' },
     ],
@@ -141,6 +179,7 @@ export const LLM_PROVIDER_TEMPLATES: LLMProviderTemplate[] = [
     baseUrl: 'http://127.0.0.1:11434',
     placeholderModels: 'llama3.2,qwen2.5',
     capabilities: ['local-runtime'],
+    configHint: '需要本机、Docker 或 self-hosted runner 能访问 Ollama 服务。',
     officialSources: [{ label: 'Ollama API', url: 'https://github.com/ollama/ollama/blob/main/docs/api.md' }],
   },
   {
@@ -157,6 +196,17 @@ export const LLM_PROVIDER_TEMPLATES: LLMProviderTemplate[] = [
 export const LLM_PROVIDER_TEMPLATE_BY_ID: Record<string, LLMProviderTemplate> = Object.fromEntries(
   LLM_PROVIDER_TEMPLATES.map((template) => [template.channelId, template]),
 );
+
+export function getProviderTemplate(channelId: string): LLMProviderTemplate | undefined {
+  if (!Object.prototype.hasOwnProperty.call(LLM_PROVIDER_TEMPLATE_BY_ID, channelId)) {
+    return undefined;
+  }
+  return LLM_PROVIDER_TEMPLATE_BY_ID[channelId];
+}
+
+export function isKnownProviderTemplate(channelId: string): boolean {
+  return channelId !== 'custom' && Boolean(getProviderTemplate(channelId));
+}
 
 export const MODEL_PLACEHOLDERS_BY_PROTOCOL: Record<ChannelProtocol, string> = {
   openai: 'gpt-5.5,qwen3.6-plus',

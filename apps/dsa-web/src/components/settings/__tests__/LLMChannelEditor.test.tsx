@@ -146,6 +146,87 @@ describe('LLMChannelEditor', () => {
     expect(screen.getByLabelText('模型（逗号分隔）')).toHaveValue(models);
   });
 
+  it('shows provider capability badges, official sources, and config hints', async () => {
+    render(
+      <LLMChannelEditor
+        items={[
+          { key: 'LLM_CHANNELS', value: 'openrouter' },
+          { key: 'LLM_OPENROUTER_PROTOCOL', value: 'openai' },
+          { key: 'LLM_OPENROUTER_BASE_URL', value: 'https://openrouter.ai/api/v1' },
+          { key: 'LLM_OPENROUTER_ENABLED', value: 'true' },
+          { key: 'LLM_OPENROUTER_API_KEY', value: 'sk-or-test' },
+          { key: 'LLM_OPENROUTER_MODELS', value: '~anthropic/claude-sonnet-latest' },
+        ]}
+        configVersion="v1"
+        maskToken="******"
+        onSaved={() => {}}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /OpenRouter/i }));
+
+    expect(await screen.findByText('配置参考')).toBeInTheDocument();
+    expect(screen.getByText('OpenAI 兼容')).toBeInTheDocument();
+    expect(screen.getByText('聚合平台')).toBeInTheDocument();
+    expect(screen.getByText('可获取模型')).toBeInTheDocument();
+    expect(screen.getByText(/模型列表和模型可见性依赖账号权限与 API Key/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'OpenRouter Models API' })).toHaveAttribute(
+      'href',
+      'https://openrouter.ai/docs/api/api-reference/models/get-models',
+    );
+    expect(screen.getByText(/能力标签仅用于配置参考，不代表运行时能力已验证通过/i)).toBeInTheDocument();
+    expect(screen.queryByText('JSON')).not.toBeInTheDocument();
+    expect(screen.queryByText('Tools')).not.toBeInTheDocument();
+    expect(screen.queryByText('Stream')).not.toBeInTheDocument();
+  });
+
+  it('shows model-discovery capability for SiliconFlow provider hints', async () => {
+    render(
+      <LLMChannelEditor
+        items={[
+          { key: 'LLM_CHANNELS', value: 'siliconflow' },
+          { key: 'LLM_SILICONFLOW_PROTOCOL', value: 'openai' },
+          { key: 'LLM_SILICONFLOW_BASE_URL', value: 'https://api.siliconflow.cn/v1' },
+          { key: 'LLM_SILICONFLOW_ENABLED', value: 'true' },
+          { key: 'LLM_SILICONFLOW_API_KEY', value: 'sk-test' },
+          { key: 'LLM_SILICONFLOW_MODELS', value: 'deepseek-ai/DeepSeek-V3.2' },
+        ]}
+        configVersion="v1"
+        maskToken="******"
+        onSaved={() => {}}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /SiliconFlow/i }));
+
+    expect(await screen.findByText('可获取模型')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'SiliconFlow Models' })).toBeInTheDocument();
+  });
+
+  it('does not show provider metadata for custom or unknown channels', async () => {
+    render(
+      <LLMChannelEditor
+        items={[
+          { key: 'LLM_CHANNELS', value: 'my_proxy' },
+          { key: 'LLM_MY_PROXY_PROTOCOL', value: 'openai' },
+          { key: 'LLM_MY_PROXY_BASE_URL', value: 'https://proxy.example.com/v1' },
+          { key: 'LLM_MY_PROXY_ENABLED', value: 'true' },
+          { key: 'LLM_MY_PROXY_API_KEY', value: 'sk-test' },
+          { key: 'LLM_MY_PROXY_MODELS', value: 'custom-model' },
+        ]}
+        configVersion="v1"
+        maskToken="******"
+        onSaved={() => {}}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /my_proxy/i }));
+
+    expect(screen.queryByText('配置参考')).not.toBeInTheDocument();
+    expect(screen.queryByText(/官方来源/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/能力标签仅用于配置参考/i)).not.toBeInTheDocument();
+  });
+
   it('preserves manually edited base URL and models when switching preset names', async () => {
     render(
       <LLMChannelEditor
@@ -203,6 +284,7 @@ describe('LLMChannelEditor', () => {
       'MiniMax-M2.7,MiniMax-M2.7-highspeed',
       'MiniMax-M2.7,MiniMax-M2.7-highspeed',
     ]);
+    expect(screen.getAllByRole('link', { name: 'MiniMax OpenAI API' })).toHaveLength(1);
   });
 
   it('saves the MiniMax preset into LLM channel env keys', async () => {
@@ -294,6 +376,109 @@ describe('LLMChannelEditor', () => {
         expect.objectContaining({ key: 'LITELLM_FALLBACK_MODELS', value: 'deepseek/deepseek-v4-pro,cohere/command-r-plus' }),
         expect.objectContaining({ key: 'VISION_MODEL', value: '' }),
         expect.objectContaining({ key: 'LLM_DEEPSEEK_MODELS', value: 'deepseek-v4-flash,deepseek-v4-pro' }),
+      ]),
+    );
+  });
+
+  it('sanitizes stale runtime models when enabled channels have no available models', async () => {
+    update.mockResolvedValue({
+      success: true,
+      configVersion: 'v2',
+      appliedCount: 1,
+      skippedMaskedCount: 0,
+      reloadTriggered: true,
+      updatedKeys: ['LLM_DEEPSEEK_BASE_URL', 'LITELLM_MODEL', 'AGENT_LITELLM_MODEL', 'LITELLM_FALLBACK_MODELS', 'VISION_MODEL'],
+      warnings: [],
+    });
+
+    render(
+      <LLMChannelEditor
+        items={[
+          { key: 'LLM_CHANNELS', value: 'deepseek' },
+          { key: 'LLM_DEEPSEEK_PROTOCOL', value: 'deepseek' },
+          { key: 'LLM_DEEPSEEK_BASE_URL', value: 'https://api.deepseek.com' },
+          { key: 'LLM_DEEPSEEK_ENABLED', value: 'false' },
+          { key: 'LLM_DEEPSEEK_API_KEY', value: 'sk-test' },
+          { key: 'LLM_DEEPSEEK_MODELS', value: 'deepseek-chat,deepseek-v4-pro' },
+          { key: 'LITELLM_MODEL', value: 'deepseek/deepseek-chat' },
+          { key: 'AGENT_LITELLM_MODEL', value: 'deepseek/deepseek-chat' },
+          { key: 'LITELLM_FALLBACK_MODELS', value: 'deepseek/deepseek-v4-pro' },
+          { key: 'VISION_MODEL', value: 'deepseek/deepseek-chat' },
+        ]}
+        configVersion="v1"
+        maskToken="******"
+        onSaved={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /DeepSeek 官方/i }));
+    fireEvent.change(screen.getByLabelText('Base URL'), {
+      target: { value: 'https://api.deepseek.com/v1' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '保存 AI 配置' }));
+
+    await waitFor(() => {
+      expect(update).toHaveBeenCalled();
+    });
+
+    const updatePayload = update.mock.calls[0][0];
+    expect(updatePayload.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'LITELLM_MODEL', value: '' }),
+        expect.objectContaining({ key: 'AGENT_LITELLM_MODEL', value: '' }),
+        expect.objectContaining({ key: 'LITELLM_FALLBACK_MODELS', value: '' }),
+        expect.objectContaining({ key: 'VISION_MODEL', value: '' }),
+      ]),
+    );
+  });
+
+  it('keeps legacy-key-backed runtime models when enabled channels have no available models', async () => {
+    update.mockResolvedValue({
+      success: true,
+      configVersion: 'v2',
+      appliedCount: 1,
+      skippedMaskedCount: 0,
+      reloadTriggered: true,
+      updatedKeys: ['LLM_PRIMARY_BASE_URL', 'LITELLM_MODEL', 'LITELLM_FALLBACK_MODELS'],
+      warnings: [],
+    });
+
+    render(
+      <LLMChannelEditor
+        items={[
+          { key: 'LLM_CHANNELS', value: 'primary' },
+          { key: 'LLM_PRIMARY_PROTOCOL', value: 'openai' },
+          { key: 'LLM_PRIMARY_BASE_URL', value: 'https://api.example.com/v1' },
+          { key: 'LLM_PRIMARY_ENABLED', value: 'false' },
+          { key: 'LLM_PRIMARY_API_KEY', value: 'sk-test' },
+          { key: 'LLM_PRIMARY_MODELS', value: 'gpt-4o-mini' },
+          { key: 'OPENAI_API_KEY', value: 'sk-legacy-value' },
+          { key: 'LITELLM_MODEL', value: 'openai/gpt-4o-mini' },
+          { key: 'LITELLM_FALLBACK_MODELS', value: 'openai/gpt-4o' },
+          { key: 'AGENT_LITELLM_MODEL', value: '' },
+          { key: 'VISION_MODEL', value: '' },
+        ]}
+        configVersion="v1"
+        maskToken="******"
+        onSaved={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /primary/i }));
+    fireEvent.change(screen.getByLabelText('Base URL'), {
+      target: { value: 'https://api.example.com/compatible/v1' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '保存 AI 配置' }));
+
+    await waitFor(() => {
+      expect(update).toHaveBeenCalled();
+    });
+
+    const updatePayload = update.mock.calls[0][0];
+    expect(updatePayload.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'LITELLM_MODEL', value: 'openai/gpt-4o-mini' }),
+        expect.objectContaining({ key: 'LITELLM_FALLBACK_MODELS', value: 'openai/gpt-4o' }),
       ]),
     );
   });
@@ -448,14 +633,114 @@ describe('LLMChannelEditor', () => {
     });
   });
 
-  it('keeps direct-env provider runtime models while saving channel changes', async () => {
+  it('keeps stale runtime fallback model available when user restores it in channel models', async () => {
     update.mockResolvedValue({
       success: true,
       configVersion: 'v2',
       appliedCount: 1,
       skippedMaskedCount: 0,
       reloadTriggered: true,
-      updatedKeys: ['LLM_DEEPSEEK_BASE_URL'],
+      updatedKeys: ['LLM_DEEPSEEK_MODELS', 'LITELLM_MODEL', 'LITELLM_FALLBACK_MODELS'],
+      warnings: [],
+    });
+
+    render(
+      <LLMChannelEditor
+        items={[
+          { key: 'LLM_CHANNELS', value: 'deepseek' },
+          { key: 'LLM_DEEPSEEK_PROTOCOL', value: 'deepseek' },
+          { key: 'LLM_DEEPSEEK_BASE_URL', value: 'https://api.deepseek.com' },
+          { key: 'LLM_DEEPSEEK_ENABLED', value: 'true' },
+          { key: 'LLM_DEEPSEEK_API_KEY', value: 'sk-test' },
+          { key: 'LLM_DEEPSEEK_MODELS', value: 'deepseek-chat' },
+          { key: 'LITELLM_MODEL', value: 'deepseek/deepseek-chat' },
+          { key: 'AGENT_LITELLM_MODEL', value: '' },
+          { key: 'LITELLM_FALLBACK_MODELS', value: 'deepseek/deepseek-old' },
+          { key: 'VISION_MODEL', value: '' },
+        ]}
+        configVersion="v1"
+        maskToken="******"
+        onSaved={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /DeepSeek 官方/i }));
+    fireEvent.change(screen.getByLabelText('模型（逗号分隔）'), {
+      target: { value: 'deepseek-chat,deepseek-old' },
+    });
+
+    expect(await screen.findByLabelText('deepseek/deepseek-old')).toBeChecked();
+
+    fireEvent.click(screen.getByRole('button', { name: '保存 AI 配置' }));
+    await waitFor(() => {
+      expect(update).toHaveBeenCalled();
+    });
+
+    const updatePayload = update.mock.calls[0][0];
+    expect(updatePayload.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'LITELLM_FALLBACK_MODELS', value: 'deepseek/deepseek-old' }),
+      ]),
+    );
+  });
+
+  it('keeps runtime selections while channel models are edited temporarily', async () => {
+    render(
+      <LLMChannelEditor
+        items={[
+          { key: 'LLM_CHANNELS', value: 'deepseek' },
+          { key: 'LLM_DEEPSEEK_PROTOCOL', value: 'deepseek' },
+          { key: 'LLM_DEEPSEEK_BASE_URL', value: 'https://api.deepseek.com' },
+          { key: 'LLM_DEEPSEEK_ENABLED', value: 'true' },
+          { key: 'LLM_DEEPSEEK_API_KEY', value: 'sk-test' },
+          { key: 'LLM_DEEPSEEK_MODELS', value: 'deepseek-chat,deepseek-reasoner,deepseek-v4-pro' },
+          { key: 'LITELLM_MODEL', value: 'deepseek/deepseek-chat' },
+          { key: 'AGENT_LITELLM_MODEL', value: 'deepseek/deepseek-reasoner' },
+          { key: 'LITELLM_FALLBACK_MODELS', value: 'deepseek/deepseek-v4-pro' },
+          { key: 'VISION_MODEL', value: 'deepseek/deepseek-reasoner' },
+        ]}
+        configVersion="v1"
+        maskToken="******"
+        onSaved={() => {}}
+      />
+    );
+
+    const primaryModelSelect = screen.getByRole('combobox', { name: '主模型' });
+    const agentModelSelect = screen.getByRole('combobox', { name: 'Agent 主模型' });
+    const visionModelSelect = screen.getByRole('combobox', { name: 'Vision 模型' });
+
+    fireEvent.click(screen.getByRole('button', { name: /DeepSeek 官方/i }));
+    const modelInput = screen.getByLabelText('模型（逗号分隔）');
+    fireEvent.change(modelInput, {
+      target: { value: 'deepseek-v4-flash' },
+    });
+
+    await waitFor(() => {
+      expect(primaryModelSelect).toHaveValue('deepseek/deepseek-chat');
+      expect(agentModelSelect).toHaveValue('deepseek/deepseek-reasoner');
+      expect(visionModelSelect).toHaveValue('deepseek/deepseek-reasoner');
+    });
+
+    fireEvent.change(modelInput, {
+      target: { value: 'deepseek-chat,deepseek-reasoner,deepseek-v4-pro' },
+    });
+
+    await waitFor(() => {
+      expect(primaryModelSelect).toHaveValue('deepseek/deepseek-chat');
+      expect(agentModelSelect).toHaveValue('deepseek/deepseek-reasoner');
+      expect(visionModelSelect).toHaveValue('deepseek/deepseek-reasoner');
+      expect(screen.getByLabelText('deepseek/deepseek-v4-pro')).toBeChecked();
+    });
+  });
+
+  it('keeps direct-env provider runtime models (cohere / google / xai) while saving channel changes', async () => {
+    update.mockResolvedValue({
+      success: true,
+      configVersion: 'v2',
+      appliedCount: 1,
+      skippedMaskedCount: 0,
+      reloadTriggered: true,
+      updatedKeys: ['LLM_DEEPSEEK_BASE_URL', 'LITELLM_MODEL', 'AGENT_LITELLM_MODEL', 'LITELLM_FALLBACK_MODELS', 'VISION_MODEL'],
       warnings: [],
     });
 
@@ -469,6 +754,9 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_DEEPSEEK_API_KEY', value: 'sk-test' },
           { key: 'LLM_DEEPSEEK_MODELS', value: 'deepseek-v4-flash' },
           { key: 'LITELLM_MODEL', value: 'cohere/command-r-plus' },
+          { key: 'AGENT_LITELLM_MODEL', value: 'google/gemini-2.5-flash' },
+          { key: 'LITELLM_FALLBACK_MODELS', value: 'cohere/command-r-plus,google/gemini-2.5-flash,xai/grok-beta' },
+          { key: 'VISION_MODEL', value: 'xai/grok-vision-beta' },
         ]}
         configVersion="v1"
         maskToken="******"
@@ -490,6 +778,9 @@ describe('LLMChannelEditor', () => {
     expect(updatePayload.items).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ key: 'LITELLM_MODEL', value: 'cohere/command-r-plus' }),
+        expect.objectContaining({ key: 'AGENT_LITELLM_MODEL', value: 'google/gemini-2.5-flash' }),
+        expect.objectContaining({ key: 'LITELLM_FALLBACK_MODELS', value: 'cohere/command-r-plus,google/gemini-2.5-flash,xai/grok-beta' }),
+        expect.objectContaining({ key: 'VISION_MODEL', value: 'xai/grok-vision-beta' }),
       ]),
     );
   });

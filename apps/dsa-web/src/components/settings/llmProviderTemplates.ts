@@ -59,6 +59,23 @@ export const LLM_PROVIDER_TEMPLATES: LLMProviderTemplate[] = [
     officialSources: [{ label: 'AIHubmix', url: 'https://aihubmix.com/' }],
   },
   {
+    channelId: 'anspire',
+    label: 'Anspire Open（一站式模型+搜索）',
+    protocol: 'openai',
+    baseUrl: 'https://open-gateway.anspire.cn/v6',
+    placeholderModels: 'Doubao-Seed-2.0-lite,Doubao-Seed-2.0-pro,qwen3.5-flash,MiniMax-M2.7',
+    capabilities: ['openai-compatible'],
+    configHint:
+      '同一 ANSPIRE_API_KEYS 可复用到搜索与 LLM 渠道。以下模型与网关为配置示例，实际可用性请以账号权限和控制台为准；建议先点“测试连接”确认。',
+    officialSources: [
+      { label: 'Anspire Open', url: 'https://open.anspire.cn/?share_code=QFBC0FYC' },
+      {
+        label: 'LiteLLM OpenAI-compatible',
+        url: 'https://docs.litellm.ai/docs/providers/openai_compatible',
+      },
+    ],
+  },
+  {
     channelId: 'deepseek',
     label: 'DeepSeek 官方',
     protocol: 'deepseek',

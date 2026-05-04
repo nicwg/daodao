@@ -22,6 +22,23 @@
 
 如果你只打算用一种模型，这是最快捷的办法。打开项目根目录下的 `.env` 文件（如果没有，复制一份 `.env.example` 并重命名为 `.env`）。
 
+### Anspire Open 示例：
+
+> 💡 **推荐 [Anspire Open](https://open.anspire.cn/?share_code=QFBC0FYC)**：支持中文优化的联网搜索与 OpenAI-compatible 路径一体化体验，适合只准备一个 Key 的用户。
+> - 以下为配置示例，模型与网关可用性以账号权限和 Anspire 控制台为准；本项目未在本次 PR 中新增可复现的线上连通性 smoke 验证。
+> - 建议在 Web 设置页点击“测试连接”进行实际鉴权与模型可用性检查，避免以文档默认值直接当作可用性承诺。
+
+```env
+# Anspire Open API Keys（支持多个，逗号分隔）
+# 获取: https://open.anspire.cn/?share_code=QFBC0FYC
+# 满足默认优先级条件时，系统会复用该 Key 处理搜索与 LLM（仅限示例兜底路径）。
+# 示例模型：Doubao-Seed-2.0-lite；示例网关：https://open-gateway.anspire.cn/v6
+ANSPIRE_API_KEYS=sk-xxxxxxxxxxxxxxxx
+# 可选：按控制台可用性切换模型或网关
+# ANSPIRE_LLM_MODEL=Doubao-Seed-2.0-pro
+# ANSPIRE_LLM_BASE_URL=https://open-gateway.anspire.ai/v6
+```
+
 ### 示例 1：使用通用第三方平台（兼容 OpenAI 格式，推荐）
 
 现在市面上绝大多数第三方聚合平台（例如硅基流动、AIHubmix、阿里百炼、智谱等）都兼容 OpenAI 的接口格式。只要平台提供了 API Key 和 Base URL，你都可以按照以下格式无脑配置：
@@ -100,6 +117,7 @@ LITELLM_MODEL=ollama/qwen3:8b
 - OpenAI Compatible 规范（LiteLLM）：<https://docs.litellm.ai/docs/providers/openai_compatible>
 - OpenAI 官方：<https://platform.openai.com/docs/api-reference/chat>
 - DeepSeek 官方：<https://api-docs.deepseek.com/>
+- Anspire Open：<https://open.anspire.cn/?share_code=QFBC0FYC>
 - 阿里百炼 DashScope 兼容模式：<https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope>
 - Moonshot / Kimi 官方：<https://platform.moonshot.ai/docs/guide/compatibility>
 - Anthropic 官方：<https://docs.anthropic.com/en/api/messages>

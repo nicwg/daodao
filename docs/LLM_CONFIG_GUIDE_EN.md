@@ -22,6 +22,23 @@ This project exposes a unified AI model access flow that supports official APIs,
 
 If you only plan to use one single model, this is the fastest way. Open the `.env` file in the project's root directory (if it doesn't exist, copy `.env.example` and rename it to `.env`).
 
+### Anspire Open Example:
+
+> 💡 **[Anspire Open](https://open.anspire.cn/?share_code=QFBC0FYC)**: supports Chinese-optimized search and OpenAI-compatible model access using a shared key.
+> - The following values are configuration examples only; model availability depends on your account and Anspire console.
+> - This PR does not add a reproducible online smoke test for Anspire connectivity; please validate with the Web "Test connection" flow before relying on production traffic.
+
+```env
+# Anspire Open API keys (multiple keys supported, separated by commas)
+# Get your key at: https://open.anspire.cn/?share_code=QFBC0FYC
+# When no higher-priority OpenAI-compatible source is set, this key is reused for Anspire search + LLM path (example fallback behavior only).
+# Example model: Doubao-Seed-2.0-lite; example gateway: https://open-gateway.anspire.cn/v6
+ANSPIRE_API_KEYS=sk-xxxxxxxxxxxxxxxx
+# Optional: switch example model or gateway according to your Anspire account and official docs.
+# ANSPIRE_LLM_MODEL=Doubao-Seed-2.0-pro
+# ANSPIRE_LLM_BASE_URL=https://open-gateway.anspire.ai/v6
+```
+
 ### Example 1: Using a Third-party OpenAI-Compatible Platform (Highly Recommended)
 
 Most third-party relay platforms and local API providers support the OpenAI interface format. As long as the platform provides an API Key and a Base URL, you can configure it easily using the following pattern:
@@ -100,6 +117,7 @@ The backend exposes a read-only status endpoint at `GET /api/v1/system/config/se
 - OpenAI-compatible routing in LiteLLM: <https://docs.litellm.ai/docs/providers/openai_compatible>
 - OpenAI official API docs: <https://platform.openai.com/docs/api-reference/chat>
 - DeepSeek official API docs: <https://api-docs.deepseek.com/>
+- Anspire Open: <https://open.anspire.cn/?share_code=QFBC0FYC>
 - DashScope OpenAI-compatible mode: <https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope>
 - Moonshot / Kimi official compatibility docs: <https://platform.moonshot.ai/docs/guide/compatibility>
 - Anthropic official Messages API: <https://docs.anthropic.com/en/api/messages>

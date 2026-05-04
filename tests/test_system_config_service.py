@@ -12,7 +12,7 @@ from tests.litellm_stub import ensure_litellm_stub
 
 ensure_litellm_stub()
 
-from src.config import Config
+from src.config import ANSPIRE_LLM_MODEL_DEFAULT, Config
 from src.core.config_manager import ConfigManager
 from src.services.system_config_service import ConfigConflictError, ConfigImportError, SystemConfigService
 
@@ -88,6 +88,53 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         self.assertEqual(checks["llm_agent"]["status"], "inherited")
         self.assertEqual(checks["stock_list"]["status"], "configured")
         self.assertEqual(checks["notification"]["status"], "optional")
+
+    def test_get_setup_status_accepts_anspire_one_key_llm(self) -> None:
+        self._rewrite_env(
+            "ANSPIRE_API_KEYS=sk-anspire-test-value",
+            "STOCK_LIST=600519",
+        )
+
+        with patch.dict(os.environ, {}, clear=True):
+            status = self.service.get_setup_status()
+
+        checks = {check["key"]: check for check in status["checks"]}
+        self.assertTrue(status["is_complete"])
+        self.assertEqual(checks["llm_primary"]["status"], "configured")
+        self.assertIn("openai/Doubao-Seed-2.0-lite", checks["llm_primary"]["message"])
+
+    def test_get_setup_status_treats_blank_anspire_channel_enabled_as_shared_disable(self) -> None:
+        self._rewrite_env(
+            "LLM_CHANNELS=anspire",
+            "LLM_ANSPIRE_ENABLED=",
+            "ANSPIRE_LLM_ENABLED=false",
+            "ANSPIRE_API_KEYS=sk-anspire-test-value",
+            "STOCK_LIST=600519",
+        )
+
+        with patch.dict(os.environ, {}, clear=True):
+            status = self.service.get_setup_status()
+
+        checks = {check["key"]: check for check in status["checks"]}
+        self.assertFalse(status["is_complete"])
+        self.assertEqual(checks["llm_primary"]["status"], "needs_action")
+        self.assertIn("llm_primary", status["required_missing_keys"])
+
+    def test_get_setup_status_respects_disabled_anspire_channel_without_legacy_fallback(self) -> None:
+        self._rewrite_env(
+            "LLM_CHANNELS=anspire",
+            "LLM_ANSPIRE_ENABLED=false",
+            "ANSPIRE_API_KEYS=sk-anspire-test-value",
+            "STOCK_LIST=600519",
+        )
+
+        with patch.dict(os.environ, {}, clear=True):
+            status = self.service.get_setup_status()
+
+        checks = {check["key"]: check for check in status["checks"]}
+        self.assertFalse(status["is_complete"])
+        self.assertEqual(checks["llm_primary"]["status"], "needs_action")
+        self.assertIn("llm_primary", status["required_missing_keys"])
 
     def test_get_setup_status_accepts_direct_env_primary_without_provider_key(self) -> None:
         self._rewrite_env(
@@ -738,6 +785,56 @@ class SystemConfigServiceTestCase(unittest.TestCase):
 
         self.assertTrue(validation["valid"])
         self.assertEqual(validation["issues"], [])
+
+    def test_validate_allows_anspire_channel_with_shared_key_defaults(self) -> None:
+        validation = self.service.validate(
+            items=[
+                {"key": "LLM_CHANNELS", "value": "anspire"},
+                {"key": "ANSPIRE_API_KEYS", "value": "sk-anspire-test-value"},
+            ]
+        )
+
+        self.assertTrue(validation["valid"])
+        self.assertEqual(validation["issues"], [])
+
+    def test_validate_treats_blank_anspire_channel_enabled_as_shared_disable(self) -> None:
+        validation = self.service.validate(
+            items=[
+                {"key": "LLM_CHANNELS", "value": "anspire"},
+                {"key": "LLM_ANSPIRE_ENABLED", "value": "   "},
+                {"key": "ANSPIRE_LLM_ENABLED", "value": "false"},
+            ]
+        )
+
+        self.assertTrue(validation["valid"], validation["issues"])
+        self.assertEqual(validation["issues"], [])
+
+    def test_validate_excludes_blank_disabled_anspire_channel_from_runtime_models(self) -> None:
+        validation = self.service.validate(
+            items=[
+                {"key": "LLM_CHANNELS", "value": "anspire"},
+                {"key": "LLM_ANSPIRE_ENABLED", "value": "   "},
+                {"key": "ANSPIRE_LLM_ENABLED", "value": "false"},
+                {"key": "ANSPIRE_API_KEYS", "value": "sk-anspire-test-value"},
+                {"key": "LITELLM_MODEL", "value": f"openai/{ANSPIRE_LLM_MODEL_DEFAULT}"},
+            ]
+        )
+
+        self.assertFalse(validation["valid"])
+        self.assertTrue(any(issue["key"] == "LITELLM_MODEL" and issue["code"] == "missing_runtime_source" for issue in validation["issues"]))
+
+    def test_validate_excludes_disabled_anspire_channel_from_legacy_runtime_source(self) -> None:
+        validation = self.service.validate(
+            items=[
+                {"key": "LLM_CHANNELS", "value": "anspire"},
+                {"key": "LLM_ANSPIRE_ENABLED", "value": "false"},
+                {"key": "ANSPIRE_API_KEYS", "value": "sk-anspire-test-value"},
+                {"key": "LITELLM_MODEL", "value": f"openai/{ANSPIRE_LLM_MODEL_DEFAULT}"},
+            ]
+        )
+
+        self.assertFalse(validation["valid"])
+        self.assertTrue(any(issue["key"] == "LITELLM_MODEL" and issue["code"] == "missing_runtime_source" for issue in validation["issues"]))
 
     @patch("litellm.completion")
     def test_test_llm_channel_returns_success_payload(self, mock_completion) -> None:

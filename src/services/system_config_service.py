@@ -16,6 +16,8 @@ from urllib.parse import urljoin, urlparse, urlunparse
 import requests
 
 from src.config import (
+    ANSPIRE_LLM_BASE_URL_DEFAULT,
+    ANSPIRE_LLM_MODEL_DEFAULT,
     SUPPORTED_LLM_CHANNEL_PROTOCOLS,
     Config,
     _get_litellm_provider,
@@ -1107,6 +1109,19 @@ class SystemConfigService:
         return any((effective_map.get(key) or "").strip() for key in keys)
 
     @classmethod
+    def _anspire_legacy_llm_enabled(cls, effective_map: Dict[str, str]) -> bool:
+        if not parse_env_bool(effective_map.get("ANSPIRE_LLM_ENABLED"), default=True):
+            return False
+        for name in cls._split_csv(effective_map.get("LLM_CHANNELS") or ""):
+            if name.strip().lower() != "anspire":
+                continue
+            enabled_raw = effective_map.get("LLM_ANSPIRE_ENABLED")
+            if not (enabled_raw or "").strip():
+                enabled_raw = effective_map.get("ANSPIRE_LLM_ENABLED")
+            return parse_env_bool(enabled_raw, default=True)
+        return True
+
+    @classmethod
     def _provider_has_setup_credentials(cls, provider: str, effective_map: Dict[str, str]) -> bool:
         normalized = canonicalize_llm_channel_protocol(provider)
         if normalized == "ollama":
@@ -1119,6 +1134,11 @@ class SystemConfigService:
             return cls._has_any_config_value(effective_map, ("DEEPSEEK_API_KEYS", "DEEPSEEK_API_KEY"))
         if normalized == "openai":
             if cls._has_any_config_value(effective_map, ("OPENAI_API_KEYS", "OPENAI_API_KEY", "AIHUBMIX_KEY")):
+                return True
+            if (
+                cls._anspire_legacy_llm_enabled(effective_map)
+                and cls._has_any_config_value(effective_map, ("ANSPIRE_API_KEYS",))
+            ):
                 return True
             base_url = (effective_map.get("OPENAI_BASE_URL") or "").strip()
             return channel_allows_empty_api_key("openai", base_url)
@@ -1146,17 +1166,36 @@ class SystemConfigService:
             if not name:
                 continue
             prefix = f"LLM_{name.upper()}"
-            enabled = parse_env_bool(effective_map.get(f"{prefix}_ENABLED"), default=True)
+            enabled_raw = effective_map.get(f"{prefix}_ENABLED")
+            if name.lower() == "anspire" and not (enabled_raw or "").strip():
+                enabled_raw = effective_map.get("ANSPIRE_LLM_ENABLED")
+            enabled = parse_env_bool(enabled_raw, default=True)
             if not enabled:
                 continue
 
             base_url = (effective_map.get(f"{prefix}_BASE_URL") or "").strip()
+            if name.lower() == "anspire" and not base_url:
+                base_url = (
+                    effective_map.get("ANSPIRE_LLM_BASE_URL")
+                    or ANSPIRE_LLM_BASE_URL_DEFAULT
+                ).strip()
             protocol = (effective_map.get(f"{prefix}_PROTOCOL") or "").strip()
+            if name.lower() == "anspire" and not protocol:
+                protocol = "openai"
             api_key = (
                 (effective_map.get(f"{prefix}_API_KEYS") or "").strip()
                 or (effective_map.get(f"{prefix}_API_KEY") or "").strip()
             )
+            if name.lower() == "anspire" and not api_key:
+                api_key = (effective_map.get("ANSPIRE_API_KEYS") or "").strip()
             raw_models = cls._split_csv(effective_map.get(f"{prefix}_MODELS") or "")
+            if name.lower() == "anspire" and not raw_models:
+                raw_models = [
+                    (
+                        effective_map.get("ANSPIRE_LLM_MODEL")
+                        or ANSPIRE_LLM_MODEL_DEFAULT
+                    ).strip()
+                ]
             resolved_protocol = resolve_llm_channel_protocol(
                 protocol,
                 base_url=base_url,
@@ -1187,6 +1226,16 @@ class SystemConfigService:
             return "deepseek/deepseek-chat"
         if cls._has_any_config_value(effective_map, ("OPENAI_API_KEYS", "OPENAI_API_KEY", "AIHUBMIX_KEY")):
             model = (effective_map.get("OPENAI_MODEL") or "gpt-5.5").strip()
+            return model if "/" in model else f"openai/{model}"
+        if (
+            cls._anspire_legacy_llm_enabled(effective_map)
+            and cls._has_any_config_value(effective_map, ("ANSPIRE_API_KEYS",))
+        ):
+            model = (
+                effective_map.get("ANSPIRE_LLM_MODEL")
+                or effective_map.get("OPENAI_MODEL")
+                or ANSPIRE_LLM_MODEL_DEFAULT
+            ).strip()
             return model if "/" in model else f"openai/{model}"
         if (effective_map.get("OLLAMA_API_BASE") or "").strip():
             model = (effective_map.get("OLLAMA_MODEL") or "").strip()
@@ -1845,17 +1894,36 @@ class SystemConfigService:
         for name in normalized_names:
             prefix = f"LLM_{name.upper()}"
             protocol_value = (effective_map.get(f"{prefix}_PROTOCOL") or "").strip()
+            if name.lower() == "anspire" and not protocol_value:
+                protocol_value = "openai"
             base_url_value = (effective_map.get(f"{prefix}_BASE_URL") or "").strip()
+            if name.lower() == "anspire" and not base_url_value:
+                base_url_value = (
+                    effective_map.get("ANSPIRE_LLM_BASE_URL")
+                    or ANSPIRE_LLM_BASE_URL_DEFAULT
+                ).strip()
             api_key_value = (
                 (effective_map.get(f"{prefix}_API_KEYS") or "").strip()
                 or (effective_map.get(f"{prefix}_API_KEY") or "").strip()
             )
+            if name.lower() == "anspire" and not api_key_value:
+                api_key_value = (effective_map.get("ANSPIRE_API_KEYS") or "").strip()
             models_value = [
                 model.strip()
                 for model in (effective_map.get(f"{prefix}_MODELS") or "").split(",")
                 if model.strip()
             ]
-            enabled = parse_env_bool(effective_map.get(f"{prefix}_ENABLED"), default=True)
+            if name.lower() == "anspire" and not models_value:
+                models_value = [
+                    (
+                        effective_map.get("ANSPIRE_LLM_MODEL")
+                        or ANSPIRE_LLM_MODEL_DEFAULT
+                    ).strip()
+                ]
+            enabled_raw = effective_map.get(f"{prefix}_ENABLED")
+            if name.lower() == "anspire" and not (enabled_raw or "").strip():
+                enabled_raw = effective_map.get("ANSPIRE_LLM_ENABLED")
+            enabled = parse_env_bool(enabled_raw, default=True)
             issues.extend(
                 SystemConfigService._validate_llm_channel_definition(
                     channel_name=name,
@@ -1886,17 +1954,34 @@ class SystemConfigService:
                 continue
 
             prefix = f"LLM_{name.upper()}"
-            enabled = parse_env_bool(effective_map.get(f"{prefix}_ENABLED"), default=True)
+            enabled_raw = effective_map.get(f"{prefix}_ENABLED")
+            if name.lower() == "anspire" and not (enabled_raw or "").strip():
+                enabled_raw = effective_map.get("ANSPIRE_LLM_ENABLED")
+            enabled = parse_env_bool(enabled_raw, default=True)
             if not enabled:
                 continue
 
             base_url_value = (effective_map.get(f"{prefix}_BASE_URL") or "").strip()
+            if name.lower() == "anspire" and not base_url_value:
+                base_url_value = (
+                    effective_map.get("ANSPIRE_LLM_BASE_URL")
+                    or ANSPIRE_LLM_BASE_URL_DEFAULT
+                ).strip()
             protocol_value = (effective_map.get(f"{prefix}_PROTOCOL") or "").strip()
+            if name.lower() == "anspire" and not protocol_value:
+                protocol_value = "openai"
             raw_models = [
                 model.strip()
                 for model in (effective_map.get(f"{prefix}_MODELS") or "").split(",")
                 if model.strip()
             ]
+            if name.lower() == "anspire" and not raw_models:
+                raw_models = [
+                    (
+                        effective_map.get("ANSPIRE_LLM_MODEL")
+                        or ANSPIRE_LLM_MODEL_DEFAULT
+                    ).strip()
+                ]
             resolved_protocol = resolve_llm_channel_protocol(protocol_value, base_url=base_url_value, models=raw_models, channel_name=name)
             for model in raw_models:
                 normalized_model = normalize_llm_channel_model(model, resolved_protocol, base_url_value)
@@ -1947,6 +2032,10 @@ class SystemConfigService:
                 (effective_map.get("OPENAI_API_KEYS") or "").strip()
                 or (effective_map.get("AIHUBMIX_KEY") or "").strip()
                 or (effective_map.get("OPENAI_API_KEY") or "").strip()
+                or (
+                    SystemConfigService._anspire_legacy_llm_enabled(effective_map)
+                    and (effective_map.get("ANSPIRE_API_KEYS") or "").strip()
+                )
             )
         return False
 

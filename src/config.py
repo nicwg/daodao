@@ -50,6 +50,10 @@ class ConfigIssue:
 _MANAGED_LITELLM_KEY_PROVIDERS = {"gemini", "vertex_ai", "anthropic", "openai", "deepseek"}
 SUPPORTED_LLM_CHANNEL_PROTOCOLS = ("openai", "anthropic", "gemini", "vertex_ai", "deepseek", "ollama")
 _FALSEY_ENV_VALUES = {"0", "false", "no", "off"}
+# Fallback defaults used when ANSPIRE_API_KEYS is reused as legacy OpenAI-compatible source.
+# These are compatibility examples; actual availability should be validated by Anspire console/model entitlement.
+ANSPIRE_LLM_BASE_URL_DEFAULT = "https://open-gateway.anspire.cn/v6"
+ANSPIRE_LLM_MODEL_DEFAULT = "Doubao-Seed-2.0-lite"
 # Kimi K2.6 is consumed through Moonshot's OpenAI-compatible API in this
 # repository. Official references:
 # - https://platform.kimi.ai/docs/guide/kimi-k2-6-quickstart
@@ -1070,14 +1074,17 @@ class Config:
             anthropic_api_keys = [_single_anthropic]
 
         # OPENAI_API_KEYS > AIHUBMIX_KEY > OPENAI_API_KEY
+        _aihubmix = os.getenv('AIHUBMIX_KEY', '').strip()
         _openai_keys_raw = os.getenv('OPENAI_API_KEYS', '')
         openai_api_keys = [k.strip() for k in _openai_keys_raw.split(',') if k.strip()]
         if not openai_api_keys:
-            _aihubmix = os.getenv('AIHUBMIX_KEY', '').strip()
             _single_openai = os.getenv('OPENAI_API_KEY', '').strip()
             _fallback_key = _aihubmix or _single_openai
             if _fallback_key:
                 openai_api_keys = [_fallback_key]
+        openai_base_url = os.getenv('OPENAI_BASE_URL') or (
+            'https://aihubmix.com/v1' if _aihubmix else None
+        )
 
         # DEEPSEEK_API_KEYS > DEEPSEEK_API_KEY (independent from OpenAI-compatible layer)
         _deepseek_keys_raw = os.getenv('DEEPSEEK_API_KEYS', '')
@@ -1087,13 +1094,48 @@ class Config:
             if _single_deepseek:
                 deepseek_api_keys = [_single_deepseek]
 
+        # Anspire Open shares the same key as Anspire Search and exposes an
+        # OpenAI-compatible LLM gateway.  When no other OpenAI-compatible key is
+        # configured, use ANSPIRE_API_KEYS as the legacy openai-compatible
+        # provider so "one key" setups work without LLM_CHANNELS.
+        anspire_keys_str = os.getenv('ANSPIRE_API_KEYS', '')
+        anspire_api_keys = [k.strip() for k in anspire_keys_str.split(',') if k.strip()]
+        anspire_llm_enabled = parse_env_bool(os.getenv('ANSPIRE_LLM_ENABLED'), default=True)
+        anspire_llm_base_url = (
+            os.getenv('ANSPIRE_LLM_BASE_URL') or ANSPIRE_LLM_BASE_URL_DEFAULT
+        ).strip()
+        _anspire_llm_model_env = os.getenv('ANSPIRE_LLM_MODEL', '').strip()
+        anspire_channel_disabled = False
+        for _raw_channel in os.getenv('LLM_CHANNELS', '').split(','):
+            if _raw_channel.strip().lower() != "anspire":
+                continue
+            _channel_enabled_raw = os.getenv('LLM_ANSPIRE_ENABLED')
+            if _channel_enabled_raw is not None and _channel_enabled_raw.strip():
+                anspire_channel_disabled = not parse_env_bool(_channel_enabled_raw, default=True)
+            else:
+                anspire_channel_disabled = not anspire_llm_enabled
+            break
+        using_anspire_llm_legacy = bool(
+            anspire_llm_enabled
+            and not anspire_channel_disabled
+            and anspire_api_keys
+            and not openai_api_keys
+        )
+        if using_anspire_llm_legacy:
+            openai_api_keys = list(anspire_api_keys)
+            openai_base_url = anspire_llm_base_url
+
         # LITELLM_MODEL: explicit config takes precedence; else infer from available keys
         litellm_model = os.getenv('LITELLM_MODEL', '').strip()
         inferred_legacy_deepseek_model = False
+        _openai_model_env = os.getenv('OPENAI_MODEL', '').strip()
+        if using_anspire_llm_legacy:
+            _openai_model_name = _anspire_llm_model_env or _openai_model_env or ANSPIRE_LLM_MODEL_DEFAULT
+        else:
+            _openai_model_name = _openai_model_env or 'gpt-5.5'
         if not litellm_model:
             _gemini_model_name = os.getenv('GEMINI_MODEL', 'gemini-3.1-pro-preview').strip()
             _anthropic_model_name = os.getenv('ANTHROPIC_MODEL', 'claude-sonnet-4-6').strip()
-            _openai_model_name = os.getenv('OPENAI_MODEL', 'gpt-5.5').strip()
             if gemini_api_keys:
                 litellm_model = f'gemini/{_gemini_model_name}'
             elif anthropic_api_keys:
@@ -1146,9 +1188,7 @@ class Config:
         if not llm_model_list:
             llm_model_list = cls._legacy_keys_to_model_list(
                 gemini_api_keys, anthropic_api_keys, openai_api_keys,
-                os.getenv('OPENAI_BASE_URL') or (
-                    'https://aihubmix.com/v1' if os.getenv('AIHUBMIX_KEY') else None
-                ),
+                openai_base_url,
                 deepseek_api_keys,
             )
             if llm_model_list:
@@ -1189,10 +1229,6 @@ class Config:
         )
 
         # 解析搜索引擎 API Keys（支持多个 key，逗号分隔）
-        # Anspire Search
-        anspire_keys_str = os.getenv('ANSPIRE_API_KEYS', '')
-        anspire_api_keys = [k.strip() for k in anspire_keys_str.split(',') if k.strip()]
-
         bocha_keys_str = os.getenv('BOCHA_API_KEYS', '')
         bocha_api_keys = [k.strip() for k in bocha_keys_str.split(',') if k.strip()]
 
@@ -1311,11 +1347,9 @@ class Config:
             # base_url is auto-set to aihubmix.com/v1 when AIHUBMIX_KEY is used and no explicit
             # OPENAI_BASE_URL override is provided.
             # Model names match upstream (e.g. gemini-3.1-pro-preview, gpt-5.5, deepseek-v4-flash).
-            openai_api_key=os.getenv('AIHUBMIX_KEY') or os.getenv('OPENAI_API_KEY') or None,
-            openai_base_url=os.getenv('OPENAI_BASE_URL') or (
-                'https://aihubmix.com/v1' if os.getenv('AIHUBMIX_KEY') else None
-            ),  # noqa: E501
-            openai_model=os.getenv('OPENAI_MODEL', 'gpt-5.5'),
+            openai_api_key=openai_api_keys[0] if openai_api_keys else None,
+            openai_base_url=openai_base_url,
+            openai_model=_openai_model_name,
             openai_vision_model=os.getenv('OPENAI_VISION_MODEL') or None,
             openai_temperature=parse_env_float(os.getenv('OPENAI_TEMPERATURE'), 0.7, field_name='OPENAI_TEMPERATURE'),
             # Vision model: VISION_MODEL > OPENAI_VISION_MODEL (alias) > default
@@ -1669,11 +1703,21 @@ class Config:
             ch_name = raw_name.strip()
             if not ch_name:
                 continue
+            ch_lower = ch_name.lower()
             ch_upper = ch_name.upper()
 
             base_url = os.getenv(f'LLM_{ch_upper}_BASE_URL', '').strip() or None
+            if ch_lower == "anspire" and not base_url:
+                base_url = (
+                    os.getenv('ANSPIRE_LLM_BASE_URL') or ANSPIRE_LLM_BASE_URL_DEFAULT
+                ).strip() or None
             protocol_raw = os.getenv(f'LLM_{ch_upper}_PROTOCOL', '').strip()
-            enabled = parse_env_bool(os.getenv(f'LLM_{ch_upper}_ENABLED'), default=True)
+            if ch_lower == "anspire" and not protocol_raw:
+                protocol_raw = "openai"
+            enabled_raw = os.getenv(f'LLM_{ch_upper}_ENABLED')
+            if ch_lower == "anspire" and (enabled_raw is None or not enabled_raw.strip()):
+                enabled_raw = os.getenv('ANSPIRE_LLM_ENABLED')
+            enabled = parse_env_bool(enabled_raw, default=True)
 
             # API keys: LLM_{NAME}_API_KEYS (multi) > LLM_{NAME}_API_KEY (single)
             api_keys_raw = os.getenv(f'LLM_{ch_upper}_API_KEYS', '')
@@ -1682,10 +1726,19 @@ class Config:
                 single_key = os.getenv(f'LLM_{ch_upper}_API_KEY', '').strip()
                 if single_key:
                     api_keys = [single_key]
+            if not api_keys and ch_lower == "anspire":
+                anspire_keys_raw = os.getenv('ANSPIRE_API_KEYS', '')
+                api_keys = [k.strip() for k in anspire_keys_raw.split(',') if k.strip()]
 
             # Models
             models_raw = os.getenv(f'LLM_{ch_upper}_MODELS', '')
             raw_models = [m.strip() for m in models_raw.split(',') if m.strip()]
+            if not raw_models and ch_lower == "anspire":
+                anspire_model = (
+                    os.getenv('ANSPIRE_LLM_MODEL') or ANSPIRE_LLM_MODEL_DEFAULT
+                ).strip()
+                if anspire_model:
+                    raw_models = [anspire_model]
             protocol = resolve_llm_channel_protocol(protocol_raw, base_url=base_url, models=raw_models, channel_name=ch_name)
             models = [normalize_llm_channel_model(m, protocol, base_url) for m in raw_models]
 

@@ -71,6 +71,8 @@ Go to your forked repo → `Settings` → `Secrets and variables` → `Actions` 
 
 #### Notification Channels (Multiple can be configured, all will receive notifications)
 
+> The P0 notification baseline, minimal/advanced key split, Actions mapping, and `--check-notify` CLI behavior are tracked in [Notification Baseline](notifications.md). A complete English notification topic remains a later follow-up.
+
 | Secret Name | Description | Required |
 |------------|------|:----:|
 | `WECHAT_WEBHOOK_URL` | WeChat Work Webhook URL | Optional |
@@ -94,6 +96,8 @@ Go to your forked repo → `Settings` → `Secrets and variables` → `Actions` 
 | `STOCK_GROUP_N` / `EMAIL_GROUP_N` | Email routing groups (Issue #268): `STOCK_GROUP_N` should be a subset of `STOCK_LIST`; affects email recipients only, not analysis scope or other channels | Optional |
 | `PUSHPLUS_TOKEN` | PushPlus Token ([Get here](https://www.pushplus.plus), Chinese push service) | Optional |
 | `SERVERCHAN3_SENDKEY` | ServerChan v3 Sendkey ([Get here](https://sc3.ft07.com/), mobile app push service) | Optional |
+| `ASTRBOT_URL` | AstrBot Webhook URL | Optional |
+| `ASTRBOT_TOKEN` | Optional AstrBot Bearer Token | Optional |
 | `CUSTOM_WEBHOOK_URLS` | Custom Webhook (supports DingTalk, etc., comma-separated) | Optional |
 | `CUSTOM_WEBHOOK_BEARER_TOKEN` | Bearer Token for custom webhooks (for authenticated webhooks) | Optional |
 | `CUSTOM_WEBHOOK_BODY_TEMPLATE` | Custom Webhook JSON body template for AstrBot, NapCat, or self-hosted services with special payloads | Optional |
@@ -101,7 +105,7 @@ Go to your forked repo → `Settings` → `Secrets and variables` → `Actions` 
 
 > *Note: Configure at least one channel; multiple channels will all receive notifications
 >
-> The default `daily_analysis.yml` in this repository only exports fixed Secret / Variable names. Arbitrary numbered env vars such as `STOCK_GROUP_1` and `EMAIL_GROUP_1` are not auto-injected into the job, so grouped email routing is not available in the stock workflow unless you explicitly extend the workflow's `env:` mapping in your own fork.
+> The default `daily_analysis.yml` in this repository only exports fixed Secret / Variable names. Arbitrary numbered env vars such as `STOCK_GROUP_1` and `EMAIL_GROUP_1` are not auto-injected into the job, so grouped email routing is not available in the stock workflow unless you explicitly extend the workflow's `env:` mapping in your own fork. P0 maps `CUSTOM_WEBHOOK_BODY_TEMPLATE`, `WEBHOOK_VERIFY_SSL`, `FEISHU_WEBHOOK_SECRET`, `FEISHU_WEBHOOK_KEYWORD`, and `PUSHPLUS_TOPIC`; `MARKDOWN_TO_IMAGE_CHANNELS` and `MERGE_EMAIL_NOTIFICATION` remain behavior toggles for a later phase.
 
 #### Push Behavior Configuration
 
@@ -192,6 +196,8 @@ Default schedule: Every weekday at **18:00 (Beijing Time)** automatic execution.
 
 ### Notification Channel Configuration
 
+For the P0 notification baseline and diagnostics, see [Notification Baseline](notifications.md).
+
 | Variable | Description | Required |
 |--------|------|:----:|
 | `WECHAT_WEBHOOK_URL` | WeChat Work Bot Webhook URL | Optional |
@@ -221,6 +227,8 @@ Default schedule: Every weekday at **18:00 (Beijing Time)** automatic execution.
 | `PUSHOVER_API_TOKEN` | Pushover API Token | Optional |
 | `PUSHPLUS_TOKEN` | PushPlus Token (Chinese push service) | Optional |
 | `SERVERCHAN3_SENDKEY` | ServerChan v3 Sendkey | Optional |
+| `ASTRBOT_URL` | AstrBot Webhook URL | Optional |
+| `ASTRBOT_TOKEN` | Optional AstrBot Bearer Token | Optional |
 
 > Note: the default `daily_analysis` GitHub Actions workflow only maps fixed variable names. It does not automatically import arbitrary numbered variables such as `STOCK_GROUP_N` / `EMAIL_GROUP_N`. This feature therefore works in local `.env`, Docker, or any runtime where you explicitly inject those variables.
 
@@ -549,6 +557,8 @@ crontab -e
 ---
 
 ## Notification Channel Configuration
+
+The P0 notification channel matrix and `--check-notify` CLI details are documented in [Notification Baseline](notifications.md).
 
 ### WeChat Work
 

@@ -180,6 +180,12 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         slack_complete = next(check for check in status["checks"] if check["key"] == "notification")
         self.assertEqual(slack_complete["status"], "configured")
 
+        self._rewrite_env(*base_lines, "ASTRBOT_URL=https://astrbot.example/webhook")
+        with patch.dict(os.environ, {}, clear=True):
+            status = self.service.get_setup_status()
+        astrbot_complete = next(check for check in status["checks"] if check["key"] == "notification")
+        self.assertEqual(astrbot_complete["status"], "configured")
+
     def test_get_setup_status_uses_runtime_env_without_reloading_singletons(self) -> None:
         self._rewrite_env("")
 

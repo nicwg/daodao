@@ -78,7 +78,7 @@ LITELLM_MODEL=ollama/qwen3:8b
 > **Important**: Ollama must be configured with `OLLAMA_API_BASE`. **Do not** use `OPENAI_BASE_URL`, or the system will concatenate URLs incorrectly (e.g. 404, `api/generate/api/show`). For remote Ollama, set `OLLAMA_API_BASE` to the actual address (e.g. `http://192.168.1.100:11434`). Current dependency constraint is `litellm>=1.80.10,!=1.82.7,!=1.82.8,<2.0.0` (matches requirements.txt).
 
 > **Congratulations! If you're a beginner, you can stop reading here and run the program!**
-> Want to test the connection? Open your terminal in the root directory and run: `python test_env.py --llm`
+> Want to test the connection? Open your terminal in the root directory and run: `python scripts/check_env.py --llm`
 
 ---
 
@@ -218,7 +218,7 @@ This layer maps directly to the underlying LiteLLM routing capabilities, includi
    ```env
    LITELLM_CONFIG=./litellm_config.yaml
    ```
-2. Create a `litellm_config.yaml` in the project root directory (you can refer to `litellm_config.example.yaml`).
+2. Create a `litellm_config.yaml` in the project root directory (you can refer to `docs/examples/litellm_config.example.yaml`).
 
 Example `litellm_config.yaml`:
 ```yaml
@@ -273,8 +273,8 @@ VISION_PROVIDER_PRIORITY=gemini,anthropic,openai
 
 Afraid you got the config wrong? Type the following commands in your terminal to diagnose:
 
-- `python test_env.py --config`: Only verifies if the logic in your `.env` is structurally correct. (Provides instant results, no network calls, strictly checks for syntax omissions).
-- `python test_env.py --llm`: Sends a real greeting to the LLM to test the actual endpoint. This thoroughly verifies if your **network is working** and if your **account has sufficient balance**.
+- `python scripts/check_env.py --config`: Only verifies if the logic in your `.env` is structurally correct. (Provides instant results, no network calls, strictly checks for syntax omissions).
+- `python scripts/check_env.py --llm`: Sends a real greeting to the LLM to test the actual endpoint. This thoroughly verifies if your **network is working** and if your **account has sufficient balance**.
 
 ### Common Pitfalls
 

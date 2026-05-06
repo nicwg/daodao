@@ -71,6 +71,8 @@ daily_stock_analysis/
 
 #### 通知渠道配置（可同时配置多个，全部推送）
 
+> 通知渠道、minimal/advanced key 分层、Actions 映射与 `--check-notify` 诊断口径详见 [通知能力基线](notifications.md)。
+
 | Secret 名称 | 说明 | 必填 |
 |------------|------|:----:|
 | `WECHAT_WEBHOOK_URL` | 企业微信 Webhook URL | 可选 |
@@ -93,6 +95,8 @@ daily_stock_analysis/
 | `EMAIL_SENDER_NAME` | 发件人显示名称（默认：daily_stock_analysis股票分析助手） | 可选 |
 | `PUSHPLUS_TOKEN` | PushPlus Token（[获取地址](https://www.pushplus.plus)，国内推送服务） | 可选 |
 | `SERVERCHAN3_SENDKEY` | Server酱³ Sendkey（[获取地址](https://sc3.ft07.com/)，手机APP推送服务） | 可选 |
+| `ASTRBOT_URL` | AstrBot Webhook URL | 可选 |
+| `ASTRBOT_TOKEN` | AstrBot Bearer Token（可选） | 可选 |
 | `CUSTOM_WEBHOOK_URLS` | 自定义 Webhook（支持钉钉等，多个用逗号分隔） | 可选 |
 | `CUSTOM_WEBHOOK_BEARER_TOKEN` | 自定义 Webhook 的 Bearer Token（用于需要认证的 Webhook） | 可选 |
 | `CUSTOM_WEBHOOK_BODY_TEMPLATE` | 自定义 Webhook JSON body 模板，适配 AstrBot、NapCat、自建服务等特殊 payload | 可选 |
@@ -100,7 +104,7 @@ daily_stock_analysis/
 
 > *注：至少配置一个渠道，配置多个则同时推送
 >
-> 当前默认 `daily_analysis.yml` 只显式映射固定 Secret / Variable 名称，不会自动把 `STOCK_GROUP_1`、`EMAIL_GROUP_1` 这类任意编号变量导入运行环境。所以分组邮箱功能目前不适用于仓库自带默认 GitHub Actions workflow；它适用于本地 `.env`、Docker，或你自行显式扩展过 `env:` 映射的运行环境。
+> 当前默认 `daily_analysis.yml` 只显式映射固定 Secret / Variable 名称，不会自动把 `STOCK_GROUP_1`、`EMAIL_GROUP_1` 这类任意编号变量导入运行环境。所以分组邮箱功能目前不适用于仓库自带默认 GitHub Actions workflow；它适用于本地 `.env`、Docker，或你自行显式扩展过 `env:` 映射的运行环境。P0 已显式映射 `CUSTOM_WEBHOOK_BODY_TEMPLATE`、`WEBHOOK_VERIFY_SSL`、`FEISHU_WEBHOOK_SECRET`、`FEISHU_WEBHOOK_KEYWORD`、`PUSHPLUS_TOPIC`；`MARKDOWN_TO_IMAGE_CHANNELS` 和 `MERGE_EMAIL_NOTIFICATION` 仍作为行为开关留给后续阶段处理。
 
 #### 推送行为配置
 
@@ -216,6 +220,8 @@ daily_stock_analysis/
 
 ### 通知渠道配置
 
+更多通知配置基线和诊断说明见 [通知能力基线](notifications.md)。
+
 | 变量名 | 说明 | 必填 |
 |--------|------|:----:|
 | `WECHAT_WEBHOOK_URL` | 企业微信机器人 Webhook URL | 可选 |
@@ -245,6 +251,8 @@ daily_stock_analysis/
 | `PUSHOVER_API_TOKEN` | Pushover API Token | 可选 |
 | `PUSHPLUS_TOKEN` | PushPlus Token（国内推送服务） | 可选 |
 | `SERVERCHAN3_SENDKEY` | Server酱³ Sendkey | 可选 |
+| `ASTRBOT_URL` | AstrBot Webhook URL | 可选 |
+| `ASTRBOT_TOKEN` | AstrBot Bearer Token（可选） | 可选 |
 
 > 说明：默认 `daily_analysis` GitHub Actions workflow 只映射固定变量名，不会自动导入任意编号的 `STOCK_GROUP_N` / `EMAIL_GROUP_N`。因此分组邮箱目前仅在本地 `.env`、Docker 或其他已显式注入这些环境变量的运行环境中生效；若你要在自己的 GitHub Actions 中使用，需在 workflow 的 job `env:` 中逐组显式映射。
 
@@ -651,6 +659,8 @@ crontab -e
 ---
 
 ## 通知渠道详细配置
+
+通知渠道矩阵、minimal/advanced key 分层和 `--check-notify` 诊断口径见 [通知能力基线](notifications.md)。
 
 ### 企业微信
 

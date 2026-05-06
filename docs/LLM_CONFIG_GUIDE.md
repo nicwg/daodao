@@ -78,7 +78,7 @@ LITELLM_MODEL=ollama/qwen3:8b
 > **重要**：Ollama 必须使用 `OLLAMA_API_BASE` 配置，**不要**使用 `OPENAI_BASE_URL`，否则系统会错误拼接 URL（如 404、`api/generate/api/show`）。远程 Ollama 时，将 `OLLAMA_API_BASE` 设为实际地址（如 `http://192.168.1.100:11434`）。当前依赖约束为 `litellm>=1.80.10,!=1.82.7,!=1.82.8,<2.0.0`（与 requirements.txt 一致）。
 
 > **恭喜！小白读到这里就可以去运行程序了！**
-> 想测测看通没通？在主目录打开命令行输入：`python test_env.py --llm`
+> 想测测看通没通？在主目录打开命令行输入：`python scripts/check_env.py --llm`
 
 ---
 
@@ -230,7 +230,7 @@ LITELLM_MODEL=ollama/qwen3:8b
    ```env
    LITELLM_CONFIG=./litellm_config.yaml
    ```
-2. 在项目根目录创建一个 `litellm_config.yaml`（可以参考自带的 `litellm_config.example.yaml`）。
+2. 在项目根目录创建一个 `litellm_config.yaml`（可以参考自带的 `docs/examples/litellm_config.example.yaml`）。
 
 示例 `litellm_config.yaml`：
 ```yaml
@@ -252,7 +252,7 @@ model_list:
 
 1. `Settings` → `Secrets and variables` → `Actions`。非敏感配置（如模型名、开关、Base URL）可以放在 `Secret` 或 `Variables`；凡是 `*_API_KEY` / `*_API_KEYS` 以及 `LLM_<NAME>_API_KEY` / `LLM_<NAME>_API_KEYS` 这类密钥字段，请统一放在 `Secret` 标签页的 `New repository secret`
 
-2. 按下表配置，只有全部必填配置正确配置，YAML 高级配置模式才可以生效，YAML配置文件的写法，可以参考自带的 `litellm_config.example.yaml`
+2. 按下表配置，只有全部必填配置正确配置，YAML 高级配置模式才可以生效，YAML配置文件的写法，可以参考自带的 `docs/examples/litellm_config.example.yaml`
 
 | Secret 名称 | 说明 | 必填 |
 |------------|------|:----:|
@@ -299,8 +299,8 @@ VISION_PROVIDER_PRIORITY=gemini,anthropic,openai
 
 配好了之后心惊胆战不知道对不对？在命令行（Terminal）里敲入下面代码帮你挂号问诊：
 
-- `python test_env.py --config` ：纯检测 `.env` 配置文件里的逻辑写得对不对，是不是少写了什么。（秒出结果，不调用网络，纯检查本地文本拼写）
-- `python test_env.py --llm` ：系统会真的发一句问候语给大模型，让你亲眼看到他的回答。这能彻底测出你的**网络通不通、账号有没有欠费**。
+- `python scripts/check_env.py --config` ：纯检测 `.env` 配置文件里的逻辑写得对不对，是不是少写了什么。（秒出结果，不调用网络，纯检查本地文本拼写）
+- `python scripts/check_env.py --llm` ：系统会真的发一句问候语给大模型，让你亲眼看到他的回答。这能彻底测出你的**网络通不通、账号有没有欠费**。
 
 ### 常见踩坑答疑台
 

@@ -396,6 +396,25 @@ class TestCustomWebhookSender(unittest.TestCase):
         self.assertTrue(result)
         self.assertEqual(mock_post.call_count, 2)
 
+    @mock.patch("src.notification_sender.custom_webhook_sender.requests.post")
+    def test_test_custom_webhooks_returns_ordered_attempts(self, mock_post):
+        mock_post.side_effect = [_response(500), _response(200)]
+        cfg = _config(
+            custom_webhook_urls=[
+                "https://example.com/fail?access_token=secret",
+                "https://example.com/ok",
+            ]
+        )
+        sender = CustomWebhookSender(cfg)
+
+        attempts = sender.test_custom_webhooks("hello", timeout_seconds=7)
+
+        self.assertEqual(len(attempts), 2)
+        self.assertFalse(attempts[0]["success"])
+        self.assertTrue(attempts[1]["success"])
+        self.assertEqual(attempts[0]["http_status"], 500)
+        self.assertEqual(mock_post.call_args_list[0].kwargs["timeout"], 7)
+
     def test_bark_payload_shape_is_stable(self):
         sender = CustomWebhookSender(_config())
 
@@ -528,6 +547,19 @@ class TestPushoverSender(unittest.TestCase):
         call_data = mock_post.call_args[1]["data"]
         self.assertEqual(call_data["user"], "U")
         self.assertEqual(call_data["token"], "T")
+
+    @mock.patch("time.sleep")
+    @mock.patch("src.notification_sender.pushover_sender.requests.post")
+    def test_send_chunked_uses_test_timeout(self, mock_post, _mock_sleep):
+        mock_post.return_value = _response(200, {"status": 1})
+        cfg = _config(pushover_user_key="U", pushover_api_token="T")
+        sender = PushoverSender(cfg)
+
+        result = sender.send_to_pushover("\n\n".join(["A" * 800, "B" * 800, "C" * 800]), timeout_seconds=9)
+
+        self.assertTrue(result)
+        self.assertGreaterEqual(mock_post.call_count, 2)
+        self.assertTrue(all(call.kwargs["timeout"] == 9 for call in mock_post.call_args_list))
 
 
 class TestPushplusSender(unittest.TestCase):

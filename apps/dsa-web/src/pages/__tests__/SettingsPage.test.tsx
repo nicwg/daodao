@@ -92,6 +92,9 @@ vi.mock('../../components/settings', () => ({
       save llm channels
     </button>
   ),
+  NotificationTestPanel: ({ items }: { items: Array<{ key: string; value: string }> }) => (
+    <div>通知测试面板:{items.map((item) => item.key).join(',')}</div>
+  ),
   SettingsAlert: ({
     title,
     message,
@@ -168,7 +171,8 @@ const baseCategories = [
   { category: 'system', title: 'System', description: '系统设置', displayOrder: 1, fields: [] },
   { category: 'base', title: 'Base', description: '基础配置', displayOrder: 2, fields: [] },
   { category: 'ai_model', title: 'AI', description: '模型配置', displayOrder: 3, fields: [] },
-  { category: 'agent', title: 'Agent', description: 'Agent 配置', displayOrder: 4, fields: [] },
+  { category: 'notification', title: 'Notification', description: '通知配置', displayOrder: 4, fields: [] },
+  { category: 'agent', title: 'Agent', description: 'Agent 配置', displayOrder: 5, fields: [] },
 ];
 
 type ConfigState = {
@@ -275,6 +279,26 @@ function buildSystemConfigState(overrides: ConfigOverride = {}) {
             dataType: 'integer',
             uiControl: 'number',
             isSensitive: false,
+            isRequired: false,
+            isEditable: true,
+            options: [],
+            validation: {},
+            displayOrder: 1,
+          },
+        },
+      ],
+      notification: [
+        {
+          key: 'WECHAT_WEBHOOK_URL',
+          value: 'https://qyapi.example.com/hook',
+          rawValueExists: true,
+          isMasked: false,
+          schema: {
+            key: 'WECHAT_WEBHOOK_URL',
+            category: 'notification',
+            dataType: 'string',
+            uiControl: 'password',
+            isSensitive: true,
             isRequired: false,
             isEditable: true,
             options: [],
@@ -596,6 +620,15 @@ describe('SettingsPage', () => {
 
     expect(refreshAfterExternalSave).toHaveBeenCalledWith(['LLM_CHANNELS']);
     expect(load).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders notification test panel before notification fields', () => {
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'notification' }));
+
+    render(<SettingsPage />);
+
+    expect(screen.getByText('通知测试面板:WECHAT_WEBHOOK_URL')).toBeInTheDocument();
+    expect(screen.getByText('WECHAT_WEBHOOK_URL')).toBeInTheDocument();
   });
 
   it('does not render desktop env backup card outside desktop runtime', () => {

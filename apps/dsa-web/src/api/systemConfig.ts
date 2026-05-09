@@ -12,6 +12,8 @@ import type {
   SystemConfigValidationErrorResponse,
   TestLLMChannelRequest,
   TestLLMChannelResponse,
+  TestNotificationChannelRequest,
+  TestNotificationChannelResponse,
   UpdateSystemConfigRequest,
   UpdateSystemConfigResponse,
   ValidateSystemConfigRequest,
@@ -99,6 +101,20 @@ function toSnakeTestChannelPayload(payload: TestLLMChannelRequest): Record<strin
   return request;
 }
 
+function toSnakeNotificationTestPayload(payload: TestNotificationChannelRequest): Record<string, unknown> {
+  return {
+    channel: payload.channel,
+    items: (payload.items || []).map((item) => ({
+      key: item.key,
+      value: item.value,
+    })),
+    mask_token: payload.maskToken ?? '******',
+    title: payload.title ?? 'DSA 通知测试',
+    content: payload.content ?? '这是一条来自 DSA Web 设置页的通知测试消息。',
+    timeout_seconds: payload.timeoutSeconds ?? 20,
+  };
+}
+
 function toSnakeDiscoverModelsPayload(payload: DiscoverLLMChannelModelsRequest): Record<string, unknown> {
   return {
     name: payload.name,
@@ -150,6 +166,14 @@ export const systemConfigApi = {
       toSnakeTestChannelPayload(payload),
     );
     return toCamelCase<TestLLMChannelResponse>(response.data);
+  },
+
+  async testNotificationChannel(payload: TestNotificationChannelRequest): Promise<TestNotificationChannelResponse> {
+    const response = await apiClient.post<Record<string, unknown>>(
+      '/api/v1/system/config/notification/test-channel',
+      toSnakeNotificationTestPayload(payload),
+    );
+    return toCamelCase<TestNotificationChannelResponse>(response.data);
   },
 
   async discoverLLMChannelModels(

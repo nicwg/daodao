@@ -31,6 +31,11 @@ export interface SystemConfigOption {
   value: string;
 }
 
+export interface SystemConfigDocLink {
+  label: string;
+  href: string;
+}
+
 export interface SystemConfigFieldSchema {
   key: string;
   title?: string;
@@ -45,6 +50,10 @@ export interface SystemConfigFieldSchema {
   options: Array<string | SystemConfigOption>;
   validation: Record<string, unknown>;
   displayOrder: number;
+  helpKey?: string | null;
+  examples?: string[];
+  docs?: SystemConfigDocLink[];
+  warningCodes?: string[];
 }
 
 export interface SystemConfigCategorySchema {
@@ -162,6 +171,50 @@ export interface TestLLMChannelResponse {
   resolvedModel?: string | null;
   latencyMs?: number | null;
   capabilityResults?: Partial<Record<LLMCapabilityCheck, LLMCapabilityCheckResult>>;
+}
+
+export type NotificationTestChannel =
+  | 'wechat'
+  | 'feishu'
+  | 'telegram'
+  | 'email'
+  | 'pushover'
+  | 'pushplus'
+  | 'serverchan3'
+  | 'custom'
+  | 'discord'
+  | 'slack'
+  | 'astrbot';
+
+export interface NotificationTestAttempt {
+  channel: NotificationTestChannel;
+  success: boolean;
+  message: string;
+  target?: string | null;
+  errorCode?: string | null;
+  stage: string;
+  retryable: boolean;
+  latencyMs?: number | null;
+  httpStatus?: number | null;
+}
+
+export interface TestNotificationChannelRequest {
+  channel: NotificationTestChannel;
+  items?: SystemConfigUpdateItem[];
+  maskToken?: string;
+  title?: string;
+  content?: string;
+  timeoutSeconds?: number;
+}
+
+export interface TestNotificationChannelResponse {
+  success: boolean;
+  message: string;
+  errorCode?: string | null;
+  stage?: string | null;
+  retryable: boolean;
+  latencyMs?: number | null;
+  attempts: NotificationTestAttempt[];
 }
 
 export interface DiscoverLLMChannelModelsRequest {

@@ -71,7 +71,7 @@ daily_stock_analysis/
 
 #### 通知渠道配置（可同时配置多个，全部推送）
 
-> 通知渠道、minimal/advanced key 分层、Actions 映射与 `--check-notify` 诊断口径详见 [通知能力基线](notifications.md)。
+> 通知渠道、minimal/advanced key 分层、Actions 映射、`--check-notify` 诊断和 Web 一键测试说明详见 [通知能力基线](notifications.md)。
 
 | Secret 名称 | 说明 | 必填 |
 |------------|------|:----:|

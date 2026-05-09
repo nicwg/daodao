@@ -61,4 +61,54 @@ describe('systemConfigApi', () => {
       expect.objectContaining({ capability_checks: ['json', 'stream'] }),
     );
   });
+
+  it('sends notification channel test payloads with snake_case fields', async () => {
+    post.mockResolvedValueOnce({
+      data: {
+        success: true,
+        message: 'ok',
+        error_code: null,
+        stage: 'notification_send',
+        retryable: false,
+        latency_ms: 15,
+        attempts: [
+          {
+            channel: 'custom',
+            success: true,
+            message: 'sent',
+            target: 'https://example.com/hook?token=***',
+            error_code: null,
+            stage: 'notification_send',
+            retryable: false,
+            latency_ms: 15,
+            http_status: 200,
+          },
+        ],
+      },
+    });
+
+    const result = await systemConfigApi.testNotificationChannel({
+      channel: 'custom',
+      items: [{ key: 'CUSTOM_WEBHOOK_URLS', value: 'https://example.com/hook?token=secret' }],
+      maskToken: '******',
+      title: 'hello',
+      content: 'world',
+      timeoutSeconds: 7,
+    });
+
+    expect(post).toHaveBeenCalledWith(
+      '/api/v1/system/config/notification/test-channel',
+      {
+        channel: 'custom',
+        items: [{ key: 'CUSTOM_WEBHOOK_URLS', value: 'https://example.com/hook?token=secret' }],
+        mask_token: '******',
+        title: 'hello',
+        content: 'world',
+        timeout_seconds: 7,
+      },
+    );
+    expect(result.latencyMs).toBe(15);
+    expect(result.attempts[0].errorCode).toBeNull();
+    expect(result.attempts[0].httpStatus).toBe(200);
+  });
 });

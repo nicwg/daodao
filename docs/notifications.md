@@ -1,6 +1,6 @@
 # 通知能力基线
 
-本文档记录通知能力 P0 基线：渠道、配置 key、GitHub Actions 映射、Web 设置元数据和 CLI 诊断口径。P0 只做基线与只读诊断，不包含 Web 一键测试、渠道路由、降噪、模板产品化等后续 Phase 能力。
+本文档记录通知能力 P0/P1 基线：渠道、配置 key、GitHub Actions 映射、Web 设置元数据、CLI 诊断口径和 Web 一键测试。P0 只做基线与只读诊断；P1 增加 Web 单渠道真实测试，不包含渠道路由、降噪、模板产品化等后续 Phase 能力。
 
 ## 渠道基线
 
@@ -50,9 +50,19 @@ python main.py --check-notify
 - 返回码 `0`：没有 error 级诊断。
 - 返回码 `1`：存在 error，例如 0 个静态通知渠道已配置，或成对 key 只配置了一半。
 
+## Web 一键测试
+
+Web 设置页的“通知渠道”分类提供单渠道测试入口。测试会使用当前页面草稿值合成临时配置，发送一条真实测试通知，但不会保存 `.env`，也不会修改运行时全局配置。
+
+- 测试范围：11 个静态通知渠道，不包含 `UNKNOWN` 和运行时上下文渠道。
+- 普通渠道：返回单次发送结果、耗时和通用错误码。
+- 自定义 Webhook：按 URL 顺序返回 attempts，展示每个 URL 的成功/失败、HTTP 状态、耗时和错误码。
+- 返回结果会脱敏 token、secret、password、Bearer、完整 webhook query 和疑似 path token。
+- 配置缺失或发送失败返回 `success=false`，不会影响已保存配置和默认分析流程。
+
 ## 场景占位
 
 - Local：优先使用 `.env`，可用 `python main.py --check-notify` 做本地诊断。
 - Docker：配置来源与本地一致，需确保容器环境变量已注入。
 - GitHub Actions：只会读取 workflow `env:` 中显式映射的 Secret/Variable。
-- Desktop：当前 P0 仅补 Web 设置元数据和诊断口径，不新增桌面端通知测试入口。
+- Desktop：桌面端内嵌 Web 设置页可复用同一通知测试入口；测试仍只使用临时配置，不写入 `.env`。

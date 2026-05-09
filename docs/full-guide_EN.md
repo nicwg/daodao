@@ -71,7 +71,7 @@ Go to your forked repo → `Settings` → `Secrets and variables` → `Actions` 
 
 #### Notification Channels (Multiple can be configured, all will receive notifications)
 
-> The P0 notification baseline, minimal/advanced key split, Actions mapping, and `--check-notify` CLI behavior are tracked in [Notification Baseline](notifications.md). A complete English notification topic remains a later follow-up.
+> The notification baseline, minimal/advanced key split, Actions mapping, `--check-notify` CLI behavior, and Web one-click notification test are tracked in [Notification Baseline](notifications.md). A complete English notification topic remains a later follow-up.
 
 | Secret Name | Description | Required |
 |------------|------|:----:|

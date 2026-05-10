@@ -28,7 +28,7 @@ If you only plan to use one single model, this is the fastest way. Open the `.en
 
 > 💡 **[Anspire Open](https://open.anspire.cn/?share_code=QFBC0FYC)**: supports Chinese-optimized search and OpenAI-compatible model access using a shared key.
 > - The following values are configuration examples only; model availability depends on your account and Anspire console.
-> - This PR does not add a reproducible online smoke test for Anspire connectivity; please validate with the Web "Test connection" flow before relying on production traffic.
+> - Documentation examples do not replace connectivity validation; please validate with the Web "Test connection" flow before relying on production traffic.
 
 ```env
 # Anspire Open API keys (multiple keys supported, separated by commas)

@@ -395,8 +395,8 @@ class SystemConfigService:
             "checks": checks,
         }
 
-    def export_desktop_env(self) -> Dict[str, Any]:
-        """Return the raw active `.env` content for desktop-only backup."""
+    def export_env(self) -> Dict[str, Any]:
+        """Return the raw active `.env` content for backup."""
         if self._manager.env_path.exists():
             content = self._manager.env_path.read_text(encoding="utf-8")
         else:
@@ -408,7 +408,11 @@ class SystemConfigService:
             "updated_at": self._manager.get_updated_at(),
         }
 
-    def import_desktop_env(
+    def export_desktop_env(self) -> Dict[str, Any]:
+        """Return the raw active `.env` content for desktop backup compatibility."""
+        return self.export_env()
+
+    def import_env(
         self,
         *,
         config_version: str,
@@ -425,6 +429,20 @@ class SystemConfigService:
             config_version=config_version,
             items=updates,
             mask_token="__DSA_IMPORT_LITERAL_MASK__",
+            reload_now=reload_now,
+        )
+
+    def import_desktop_env(
+        self,
+        *,
+        config_version: str,
+        content: str,
+        reload_now: bool = True,
+    ) -> Dict[str, Any]:
+        """Merge imported `.env` assignments for desktop backup compatibility."""
+        return self.import_env(
+            config_version=config_version,
+            content=content,
             reload_now=reload_now,
         )
 
@@ -1619,6 +1637,31 @@ class SystemConfigService:
                     "actual": value,
                 }
             )
+
+        if "allowed_values" in validation and value:
+            delimiter = validation.get("delimiter")
+            raw_values = value.split(delimiter) if delimiter else [value]
+            allowed_values = {str(item).strip().lower() for item in validation["allowed_values"]}
+            invalid_values = []
+            seen_invalid = set()
+            for raw_item in raw_values:
+                item = raw_item.strip().lower()
+                if not item:
+                    continue
+                if item not in allowed_values and item not in seen_invalid:
+                    invalid_values.append(item)
+                    seen_invalid.add(item)
+            if invalid_values:
+                issues.append(
+                    {
+                        "key": key,
+                        "code": "invalid_allowed_value",
+                        "message": "Value contains unsupported item(s)",
+                        "severity": "error",
+                        "expected": ",".join(str(item) for item in validation["allowed_values"]),
+                        "actual": ", ".join(invalid_values),
+                    }
+                )
 
         if validation.get("item_type") == "url":
             delimiter = validation.get("delimiter", ",")

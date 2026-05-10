@@ -213,5 +213,34 @@ class TestDiscordInteractionPublicKeyField(unittest.TestCase):
         self.assertIn("DISCORD_INTERACTIONS_PUBLIC_KEY", field_keys)
 
 
+class TestNotificationRouteFieldsRegistered(unittest.TestCase):
+    """P3 notification route keys must be visible and validated in settings schema."""
+
+    _ROUTE_KEYS = (
+        "NOTIFICATION_REPORT_CHANNELS",
+        "NOTIFICATION_ALERT_CHANNELS",
+        "NOTIFICATION_SYSTEM_ERROR_CHANNELS",
+    )
+
+    def test_field_definitions_exist(self):
+        for key in self._ROUTE_KEYS:
+            field = get_field_definition(key)
+            self.assertEqual(field["category"], "notification", f"{key} category")
+            self.assertEqual(field["data_type"], "array", f"{key} data_type")
+            self.assertFalse(field["is_sensitive"], f"{key} should not be sensitive")
+            self.assertIn("email", field["validation"]["allowed_values"])
+
+    def test_schema_response_includes_route_fields(self):
+        schema = build_schema_response()
+        notification_cat = next(
+            (c for c in schema["categories"] if c["category"] == "notification"),
+            None,
+        )
+        self.assertIsNotNone(notification_cat, "notification category missing")
+        field_keys = {f["key"] for f in notification_cat["fields"]}
+        for key in self._ROUTE_KEYS:
+            self.assertIn(key, field_keys, f"{key} missing from schema response")
+
+
 if __name__ == "__main__":
     unittest.main()

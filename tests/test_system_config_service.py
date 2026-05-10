@@ -349,6 +349,19 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         self.assertFalse(validation["valid"])
         self.assertTrue(any(issue["code"] == "invalid_url" for issue in validation["issues"]))
 
+    def test_validate_reports_invalid_notification_route_channel(self) -> None:
+        validation = self.service.validate(
+            items=[{"key": "NOTIFICATION_REPORT_CHANNELS", "value": "wechat,ntfy,email"}]
+        )
+        self.assertFalse(validation["valid"])
+        self.assertTrue(
+            any(
+                issue["key"] == "NOTIFICATION_REPORT_CHANNELS"
+                and issue["code"] == "invalid_allowed_value"
+                for issue in validation["issues"]
+            )
+        )
+
     def test_validate_warns_when_feishu_app_credentials_are_used_without_webhook(self) -> None:
         validation = self.service.validate(
             items=[

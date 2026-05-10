@@ -437,6 +437,47 @@ class TestCustomWebhookSender(unittest.TestCase):
         self.assertEqual(len(payload["body"]), 4000)
         self.assertEqual(payload["body"], "x" * 4000)
 
+    def test_custom_body_template_overrides_bark_auto_payload(self):
+        cfg = _config(
+            custom_webhook_body_template=(
+                '{"title":$title_json,"body":$content_json,"sound":"bell"}'
+            ),
+        )
+        sender = CustomWebhookSender(cfg)
+
+        payload = sender._build_custom_webhook_payload("https://api.day.app/key", "hello")
+
+        self.assertEqual(
+            payload,
+            {
+                "title": "股票分析报告",
+                "body": "hello",
+                "sound": "bell",
+            },
+        )
+        self.assertNotIn("group", payload)
+
+    def test_custom_body_template_json_placeholders_escape_content(self):
+        cfg = _config(
+            custom_webhook_body_template=(
+                '{"title":$title_json,"content":$content_json}'
+            ),
+        )
+        sender = CustomWebhookSender(cfg)
+
+        payload = sender._build_custom_webhook_payload(
+            "https://example.com/webhook",
+            'line 1\nline "2"',
+        )
+
+        self.assertEqual(
+            payload,
+            {
+                "title": "股票分析报告",
+                "content": 'line 1\nline "2"',
+            },
+        )
+
     @mock.patch("src.notification_sender.custom_webhook_sender.requests.post")
     def test_send_uses_custom_body_template(self, mock_post):
         mock_post.return_value = _response(200)

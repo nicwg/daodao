@@ -11,8 +11,9 @@ from copy import deepcopy
 from typing import Any, Dict, List, Optional
 
 from src.config import AGENT_MAX_STEPS_DEFAULT
+from src.notification_routing import ROUTABLE_NOTIFICATION_CHANNELS
 
-SCHEMA_VERSION = "2026-05-05"
+SCHEMA_VERSION = "2026-05-10"
 
 _CATEGORY_DEFINITIONS: List[Dict[str, Any]] = [
     {
@@ -904,8 +905,10 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     "CUSTOM_WEBHOOK_BODY_TEMPLATE": {
         "title": "Custom Webhook Body Template",
         "description": (
-            "Optional JSON body template for custom webhooks. Supports $content_json, "
-            "$content, $title_json, and $title placeholders."
+            "Optional global JSON body template for custom webhooks. It is rendered before "
+            "URL auto-detected payloads such as Bark, Slack, or Discord, and must render to a "
+            "JSON object. Prefer $content_json and $title_json; raw $content and $title are "
+            "not JSON-escaped and can make the template invalid."
         ),
         "category": "notification",
         "data_type": "string",
@@ -1454,6 +1457,48 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {},
         "display_order": 61,
+    },
+    "NOTIFICATION_REPORT_CHANNELS": {
+        "title": "Report Notification Channels",
+        "description": "Comma-separated route for report notifications. Empty keeps all configured channels.",
+        "category": "notification",
+        "data_type": "array",
+        "ui_control": "textarea",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [{"label": channel, "value": channel} for channel in ROUTABLE_NOTIFICATION_CHANNELS],
+        "validation": {"allowed_values": list(ROUTABLE_NOTIFICATION_CHANNELS), "delimiter": ","},
+        "display_order": 62,
+    },
+    "NOTIFICATION_ALERT_CHANNELS": {
+        "title": "Alert Notification Channels",
+        "description": "Comma-separated route for event alert notifications. Empty keeps all configured channels.",
+        "category": "notification",
+        "data_type": "array",
+        "ui_control": "textarea",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [{"label": channel, "value": channel} for channel in ROUTABLE_NOTIFICATION_CHANNELS],
+        "validation": {"allowed_values": list(ROUTABLE_NOTIFICATION_CHANNELS), "delimiter": ","},
+        "display_order": 63,
+    },
+    "NOTIFICATION_SYSTEM_ERROR_CHANNELS": {
+        "title": "System Error Notification Channels",
+        "description": "Comma-separated route reserved for system error notifications. Empty keeps all configured channels.",
+        "category": "notification",
+        "data_type": "array",
+        "ui_control": "textarea",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [{"label": channel, "value": channel} for channel in ROUTABLE_NOTIFICATION_CHANNELS],
+        "validation": {"allowed_values": list(ROUTABLE_NOTIFICATION_CHANNELS), "delimiter": ","},
+        "display_order": 64,
     },
     "SCHEDULE_TIME": {
         "title": "Schedule Time",

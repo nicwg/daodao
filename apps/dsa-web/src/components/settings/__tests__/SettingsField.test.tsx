@@ -83,6 +83,39 @@ describe('SettingsField', () => {
     expect(screen.getAllByRole('button', { name: '删除' })).toHaveLength(2);
   });
 
+  it('renders localized custom webhook body template guidance', () => {
+    const onChange = vi.fn();
+
+    render(
+      <SettingsField
+        item={{
+          key: 'CUSTOM_WEBHOOK_BODY_TEMPLATE',
+          value: '',
+          rawValueExists: false,
+          isMasked: false,
+          schema: {
+            key: 'CUSTOM_WEBHOOK_BODY_TEMPLATE',
+            category: 'notification',
+            dataType: 'string',
+            uiControl: 'textarea',
+            isSensitive: false,
+            isRequired: false,
+            isEditable: true,
+            options: [],
+            validation: {},
+            displayOrder: 52,
+          },
+        }}
+        value=""
+        onChange={onChange}
+      />
+    );
+
+    expect(screen.getByLabelText('自定义 Webhook Body 模板')).toBeInTheDocument();
+    expect(screen.getByText(/会先于 Bark、Slack、Discord 等自动 payload 生效/)).toBeInTheDocument();
+    expect(screen.getByText(/裸 \$content \/ \$title 不做 JSON 转义/)).toBeInTheDocument();
+  });
+
   it('opens detailed field help when help metadata is available', () => {
     render(
       <SettingsField

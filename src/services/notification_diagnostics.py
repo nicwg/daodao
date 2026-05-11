@@ -8,6 +8,13 @@ from typing import List, Literal, Optional, Sequence, Tuple
 
 from src.config import Config
 from src.notification import ChannelDetector, NotificationChannel, NotificationService
+from src.notification_noise import (
+    NOTIFICATION_SEVERITIES,
+    P4_NOISE_ENV_KEYS,
+    is_supported_notification_severity,
+    parse_notification_quiet_hours,
+    validate_notification_timezone,
+)
 from src.notification_routing import (
     NOTIFICATION_ROUTE_CONFIGS,
     ROUTABLE_NOTIFICATION_CHANNELS,
@@ -187,6 +194,14 @@ KEY_SPECS: Tuple[NotificationKeySpec, ...] = tuple(
         channel="routing",
     )
     for route in NOTIFICATION_ROUTE_CONFIGS.values()
+) + tuple(
+    NotificationKeySpec(
+        key=key,
+        tier="advanced",
+        description="Optional notification noise-control setting.",
+        channel="noise",
+    )
+    for key in P4_NOISE_ENV_KEYS
 )
 
 P0_ACTIONS_ENV_KEYS: Tuple[str, ...] = (
@@ -200,6 +215,8 @@ P0_ACTIONS_ENV_KEYS: Tuple[str, ...] = (
 P3_ROUTE_ENV_KEYS: Tuple[str, ...] = tuple(
     route["env_key"] for route in NOTIFICATION_ROUTE_CONFIGS.values()
 )
+
+P4_NOISE_ACTIONS_ENV_KEYS: Tuple[str, ...] = P4_NOISE_ENV_KEYS
 
 
 def _value(config: Config, attr: str):
@@ -274,7 +291,7 @@ def run_notification_diagnostics(config: Config) -> NotificationDiagnosticResult
         _issue(
             "info",
             "phase_scope",
-            "通知诊断会检查渠道基线、只读诊断、Web 测试和 P3 路由配置；降噪和长尾渠道留给后续 Phase。",
+            "通知诊断会检查渠道基线、只读诊断、Web 测试、P3 路由配置和 P4 降噪配置；长尾渠道留给后续 Phase。",
         ),
     ]
 
@@ -410,6 +427,59 @@ def run_notification_diagnostics(config: Config) -> NotificationDiagnosticResult
                     key=route_config["env_key"],
                 )
             )
+
+    if getattr(config, "notification_quiet_hours", ""):
+        try:
+            parse_notification_quiet_hours(config.notification_quiet_hours)
+        except ValueError as exc:
+            errors.append(
+                _issue(
+                    "error",
+                    "invalid_quiet_hours",
+                    f"NOTIFICATION_QUIET_HOURS 配置无效: {exc}",
+                    key="NOTIFICATION_QUIET_HOURS",
+                )
+            )
+
+    if getattr(config, "notification_timezone", ""):
+        try:
+            validate_notification_timezone(config.notification_timezone)
+        except ValueError as exc:
+            errors.append(
+                _issue(
+                    "error",
+                    "invalid_notification_timezone",
+                    f"NOTIFICATION_TIMEZONE 配置无效: {exc}",
+                    key="NOTIFICATION_TIMEZONE",
+                )
+            )
+
+    min_severity = getattr(config, "notification_min_severity", "") or ""
+    if min_severity and not is_supported_notification_severity(min_severity):
+        errors.append(
+            _issue(
+                "error",
+                "invalid_notification_min_severity",
+                (
+                    "NOTIFICATION_MIN_SEVERITY 配置无效；"
+                    f"允许值: {', '.join(NOTIFICATION_SEVERITIES)}。"
+                ),
+                key="NOTIFICATION_MIN_SEVERITY",
+            )
+        )
+
+    if getattr(config, "notification_daily_digest_enabled", False):
+        warnings.append(
+            _issue(
+                "warning",
+                "reserved_daily_digest",
+                (
+                    "NOTIFICATION_DAILY_DIGEST_ENABLED 当前为预留配置；"
+                    "P4 不会发送每日摘要或持久化摘要内容。"
+                ),
+                key="NOTIFICATION_DAILY_DIGEST_ENABLED",
+            )
+        )
 
     return NotificationDiagnosticResult(
         configured_channels=configured,

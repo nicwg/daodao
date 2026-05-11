@@ -83,6 +83,50 @@ describe('SettingsField', () => {
     expect(screen.getAllByRole('button', { name: '删除' })).toHaveLength(2);
   });
 
+  it('allows optional select fields to be cleared when schema provides an empty option', () => {
+    const onChange = vi.fn();
+
+    render(
+      <SettingsField
+        item={{
+          key: 'NOTIFICATION_MIN_SEVERITY',
+          value: 'warning',
+          rawValueExists: true,
+          isMasked: false,
+          schema: {
+            key: 'NOTIFICATION_MIN_SEVERITY',
+            title: 'Notification Minimum Severity',
+            category: 'notification',
+            dataType: 'string',
+            uiControl: 'select',
+            isSensitive: false,
+            isRequired: false,
+            isEditable: true,
+            options: [
+              { label: 'Not set', value: '' },
+              { label: 'info', value: 'info' },
+              { label: 'warning', value: 'warning' },
+              { label: 'error', value: 'error' },
+              { label: 'critical', value: 'critical' },
+            ],
+            validation: { enum: ['', 'info', 'warning', 'error', 'critical'] },
+            displayOrder: 69,
+          },
+        }}
+        value="warning"
+        onChange={onChange}
+      />
+    );
+
+    const select = screen.getByLabelText('NOTIFICATION_MIN_SEVERITY');
+    expect(screen.getByRole('option', { name: 'Not set' })).not.toBeDisabled();
+    expect(screen.queryByRole('option', { name: '请选择' })).not.toBeInTheDocument();
+
+    fireEvent.change(select, { target: { value: '' } });
+
+    expect(onChange).toHaveBeenCalledWith('NOTIFICATION_MIN_SEVERITY', '');
+  });
+
   it('renders localized custom webhook body template guidance', () => {
     const onChange = vi.fn();
 

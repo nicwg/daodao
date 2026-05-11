@@ -43,6 +43,7 @@ from src.core.config_registry import (
     get_field_definition,
     get_registered_field_keys,
 )
+from src.notification_noise import validate_notification_timezone
 
 logger = logging.getLogger(__name__)
 
@@ -1626,6 +1627,35 @@ class SystemConfigService:
                             }
                         )
 
+        elif validation.get("pattern"):
+            pattern = validation["pattern"]
+            if not re.match(pattern, value.strip()):
+                issues.append(
+                    {
+                        "key": key,
+                        "code": "invalid_format",
+                        "message": "Value does not match the required format",
+                        "severity": "error",
+                        "expected": pattern,
+                        "actual": value,
+                    }
+                )
+
+        if validation.get("timezone") and value:
+            try:
+                validate_notification_timezone(value)
+            except ValueError as exc:
+                issues.append(
+                    {
+                        "key": key,
+                        "code": "invalid_timezone",
+                        "message": str(exc),
+                        "severity": "error",
+                        "expected": "valid IANA timezone or empty",
+                        "actual": value,
+                    }
+                )
+
         if "enum" in validation and value and value not in validation["enum"]:
             issues.append(
                 {
@@ -3018,6 +3048,21 @@ class SystemConfigService:
             )
         )
         issues.extend(SystemConfigService._validate_llm_runtime_selection(effective_map=effective_map))
+
+        if parse_env_bool(effective_map.get("NOTIFICATION_DAILY_DIGEST_ENABLED"), default=False):
+            issues.append(
+                {
+                    "key": "NOTIFICATION_DAILY_DIGEST_ENABLED",
+                    "code": "reserved_notification_daily_digest",
+                    "message": (
+                        "NOTIFICATION_DAILY_DIGEST_ENABLED is reserved; "
+                        "the current P4 implementation does not send daily digests."
+                    ),
+                    "severity": "warning",
+                    "expected": "reserved flag only",
+                    "actual": effective_map.get("NOTIFICATION_DAILY_DIGEST_ENABLED", ""),
+                }
+            )
 
         return issues
 

@@ -1,6 +1,6 @@
 # 通知能力基线
 
-本文档记录通知能力 P0-P3 基线：渠道、配置 key、GitHub Actions 映射、Web 设置元数据、CLI 诊断口径、Web 一键测试、自定义 Webhook Body 模板语义和通知路由策略。P0 只做基线与只读诊断；P1 增加 Web 单渠道真实测试；P2 产品化现有 Body 模板；P3 增加 report / alert / system_error 路由，不包含降噪、per-URL 模板或新增一等渠道。
+本文档记录通知能力 P0-P4 基线：渠道、配置 key、GitHub Actions 映射、Web 设置元数据、CLI 诊断口径、Web 一键测试、自定义 Webhook Body 模板语义、通知路由策略和降噪机制。P0 只做基线与只读诊断；P1 增加 Web 单渠道真实测试；P2 产品化现有 Body 模板；P3 增加 report / alert / system_error 路由；P4 增加进程内降噪，不包含 per-URL 模板、跨进程持久化、真实每日摘要或新增一等渠道。
 
 ## 渠道基线
 
@@ -26,7 +26,8 @@
 - Minimal key：足以启用一个通知渠道的最小配置。
 - Advanced key：只影响认证、安全、格式、线程、群组、证书校验或展示行为，不能单独启用渠道。
 - P3 的 `NOTIFICATION_*_CHANNELS` 属于 Advanced key：只收窄已启用渠道，不会单独启用渠道。
-- 降噪、长尾渠道和更细粒度路由不在 P3 范围内；相关配置如未来引入，应先更新本文档、`.env.example`、Web 元数据与回归测试。
+- P4 的 `NOTIFICATION_DEDUP_TTL_SECONDS`、`NOTIFICATION_COOLDOWN_SECONDS`、`NOTIFICATION_QUIET_HOURS`、`NOTIFICATION_TIMEZONE`、`NOTIFICATION_MIN_SEVERITY`、`NOTIFICATION_DAILY_DIGEST_ENABLED` 属于 Advanced key：只影响已启用静态渠道的发送策略，不会单独启用渠道。
+- 长尾渠道、更细粒度路由、跨进程降噪和真实每日摘要不在 P4 范围内；相关配置如未来引入，应先更新本文档、`.env.example`、Web 元数据与回归测试。
 
 ## GitHub Actions 映射
 
@@ -43,6 +44,15 @@ P3 补齐以下通知路由映射：
 - `NOTIFICATION_REPORT_CHANNELS`
 - `NOTIFICATION_ALERT_CHANNELS`
 - `NOTIFICATION_SYSTEM_ERROR_CHANNELS`
+
+P4 补齐以下通知降噪映射：
+
+- `NOTIFICATION_DEDUP_TTL_SECONDS`
+- `NOTIFICATION_COOLDOWN_SECONDS`
+- `NOTIFICATION_QUIET_HOURS`
+- `NOTIFICATION_TIMEZONE`
+- `NOTIFICATION_MIN_SEVERITY`
+- `NOTIFICATION_DAILY_DIGEST_ENABLED`
 
 默认 workflow 仍不映射 `MARKDOWN_TO_IMAGE_CHANNELS` 与 `MERGE_EMAIL_NOTIFICATION`。它们是发送形态或聚合行为开关，不是渠道凭证；在 Actions 中自动开始读取同名 Secret/Variable 会引入额外行为变化。
 
@@ -125,6 +135,36 @@ P3 新增三类通知路由配置：
 - 路由过滤发生在 Markdown 转图片前，`MARKDOWN_TO_IMAGE_CHANNELS` 只对路由后的渠道子集生效。
 - `MERGE_EMAIL_NOTIFICATION` 不需要额外配置；只要 `email` 仍在 report 路由后的渠道中，现有合并邮件行为保持不变。
 - `--check-notify` 会把未知渠道值报为 error，把合法但未启用的路由目标报为 warning。
+
+## 通知降噪机制
+
+P4 新增进程内降噪，只影响静态配置渠道，不影响 `send_to_context()` 的机器人触发会话回执。默认所有配置关闭，未设置时保持旧行为。
+
+| 配置 key | 默认值 | 说明 |
+| --- | --- | --- |
+| `NOTIFICATION_DEDUP_TTL_SECONDS` | `0` | 同一稳定去重 key 在 TTL 内只发送一次；`0` 关闭 |
+| `NOTIFICATION_COOLDOWN_SECONDS` | `0` | 同一冷却 key 在窗口内限频；`0` 关闭 |
+| `NOTIFICATION_QUIET_HOURS` | 空 | 静默时段，格式 `HH:MM-HH:MM`，支持跨午夜 |
+| `NOTIFICATION_TIMEZONE` | 空 | 静默时段时区，如 `Asia/Shanghai`；留空使用 Python 运行时本地时区（通常由进程 `TZ` 或系统时区决定） |
+| `NOTIFICATION_MIN_SEVERITY` | 空 | `info`, `warning`, `error`, `critical`；留空不过滤 |
+| `NOTIFICATION_DAILY_DIGEST_ENABLED` | `false` | 预留配置；当前不会发送每日摘要或持久化摘要内容 |
+
+严重级别默认值：
+
+- `report`：`info`
+- `alert`：`warning`
+- `system_error`：`error`
+- 未知或未设置路由：`info`
+
+实现边界：
+
+- 去重 / 冷却状态是当前 Python 进程内 dict，适用于 `main.py` 单进程和 `--serve` 单 worker。
+- `uvicorn --workers N`、多容器或多台机器场景下状态不共享，降噪为 per-worker 近似生效。
+- pipeline 单股和聚合报告路径使用稳定 key，避免报告内生成时间变化击穿去重；其他未显式传入 `dedup_key` 的 report 通知按内容 hash 去重。
+- 未显式传入 `cooldown_key` 的调用按路由和严重级别共享默认冷却槽位，例如 report / info 的普通通知会共用同一个槽位。
+- 同一进程内相同 key 的并发发送会先占用短生命周期 in-flight 槽位，避免突发重复发送；静态渠道全部失败时释放该槽位，不写入正式去重 / 冷却状态。
+- 降噪判断异常时 fail-open：记录日志并继续发送静态渠道。
+- `NOTIFICATION_TIMEZONE` 留空时使用 `datetime.now().astimezone()` 解析到的运行时本地时区；Actions / Docker 场景建议显式配置 `NOTIFICATION_TIMEZONE` 以避免时区歧义。
 
 ## 场景占位
 

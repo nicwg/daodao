@@ -149,7 +149,7 @@ class TestPipelineWechatOnlyImageRouting(unittest.TestCase):
 
 
 class _FakeRoutedNotifier:
-    def __init__(self, routed_channels, image_channels=None):
+    def __init__(self, routed_channels, image_channels=None, noise_should_send=True):
         self._markdown_to_image_channels = set(image_channels or [])
         self._markdown_to_image_max_chars = 15000
         self.generate_dashboard_report = MagicMock(side_effect=self._generate_dashboard_report)
@@ -164,6 +164,14 @@ class _FakeRoutedNotifier:
         )
         self.get_channels_for_route = MagicMock(return_value=list(routed_channels))
         self.send_to_context = MagicMock(return_value=False)
+        self.evaluate_noise_control = MagicMock(
+            return_value=SimpleNamespace(
+                should_send=noise_should_send,
+                message="noise suppressed" if not noise_should_send else "",
+            )
+        )
+        self.record_noise_control = MagicMock()
+        self.release_noise_control = MagicMock()
         self._should_use_image_for_channel = MagicMock(
             side_effect=lambda channel, image_bytes: (
                 channel.value in self._markdown_to_image_channels and image_bytes is not None
@@ -202,6 +210,11 @@ class TestPipelineReportRouteFiltering(unittest.TestCase):
         pipeline.notifier.send_to_telegram.assert_called_once_with("report:000001")
         pipeline.notifier.send_to_wechat.assert_not_called()
         pipeline.notifier.send_to_email.assert_not_called()
+        pipeline.notifier.evaluate_noise_control.assert_called_once()
+        noise_kwargs = pipeline.notifier.evaluate_noise_control.call_args.kwargs
+        self.assertEqual(noise_kwargs["dedup_key"], "report:aggregate:simple:000001")
+        self.assertEqual(noise_kwargs["cooldown_key"], "report:aggregate:simple:000001")
+        pipeline.notifier.record_noise_control.assert_called_once()
 
     def test_markdown_to_image_uses_route_filtered_channels(self):
         pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
@@ -218,6 +231,35 @@ class TestPipelineReportRouteFiltering(unittest.TestCase):
         mock_md2img.assert_not_called()
         pipeline.notifier.send_to_email.assert_called_once_with("report:000001")
         pipeline.notifier.send_to_telegram.assert_not_called()
+
+    def test_noise_suppression_happens_before_markdown_to_image(self):
+        pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+        pipeline.notifier = _FakeRoutedNotifier(
+            [NotificationChannel.TELEGRAM],
+            image_channels={"telegram"},
+            noise_should_send=False,
+        )
+        pipeline.config = SimpleNamespace(stock_email_groups=[])
+        results = [SimpleNamespace(code="000001")]
+
+        with patch("src.md2img.markdown_to_image", return_value=b"png") as mock_md2img:
+            pipeline._send_notifications(results, ReportType.SIMPLE)
+
+        mock_md2img.assert_not_called()
+        pipeline.notifier.send_to_telegram.assert_not_called()
+        pipeline.notifier.record_noise_control.assert_not_called()
+
+    def test_noise_reservation_released_when_pipeline_static_send_raises(self):
+        pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+        pipeline.notifier = _FakeRoutedNotifier([NotificationChannel.TELEGRAM])
+        pipeline.notifier.send_to_telegram.side_effect = RuntimeError("send failed")
+        pipeline.config = SimpleNamespace(stock_email_groups=[])
+        results = [SimpleNamespace(code="000001")]
+
+        pipeline._send_notifications(results, ReportType.SIMPLE)
+
+        pipeline.notifier.record_noise_control.assert_not_called()
+        pipeline.notifier.release_noise_control.assert_called_once()
 
 
 if __name__ == "__main__":

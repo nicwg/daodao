@@ -362,6 +362,63 @@ class SystemConfigServiceTestCase(unittest.TestCase):
             )
         )
 
+    def test_validate_reports_invalid_notification_quiet_hours(self) -> None:
+        validation = self.service.validate(
+            items=[{"key": "NOTIFICATION_QUIET_HOURS", "value": "9:00-18:00"}]
+        )
+
+        self.assertFalse(validation["valid"])
+        self.assertTrue(
+            any(
+                issue["key"] == "NOTIFICATION_QUIET_HOURS"
+                and issue["code"] == "invalid_format"
+                for issue in validation["issues"]
+            )
+        )
+
+    def test_validate_reports_invalid_notification_timezone(self) -> None:
+        validation = self.service.validate(
+            items=[{"key": "NOTIFICATION_TIMEZONE", "value": "Mars/Olympus"}]
+        )
+
+        self.assertFalse(validation["valid"])
+        self.assertTrue(
+            any(
+                issue["key"] == "NOTIFICATION_TIMEZONE"
+                and issue["code"] == "invalid_timezone"
+                for issue in validation["issues"]
+            )
+        )
+
+    def test_validate_reports_invalid_notification_min_severity(self) -> None:
+        validation = self.service.validate(
+            items=[{"key": "NOTIFICATION_MIN_SEVERITY", "value": "notice"}]
+        )
+
+        self.assertFalse(validation["valid"])
+        self.assertTrue(
+            any(
+                issue["key"] == "NOTIFICATION_MIN_SEVERITY"
+                and issue["code"] == "invalid_enum"
+                for issue in validation["issues"]
+            )
+        )
+
+    def test_validate_warns_daily_digest_is_reserved(self) -> None:
+        validation = self.service.validate(
+            items=[{"key": "NOTIFICATION_DAILY_DIGEST_ENABLED", "value": "true"}]
+        )
+
+        self.assertTrue(validation["valid"])
+        self.assertTrue(
+            any(
+                issue["key"] == "NOTIFICATION_DAILY_DIGEST_ENABLED"
+                and issue["code"] == "reserved_notification_daily_digest"
+                and issue["severity"] == "warning"
+                for issue in validation["issues"]
+            )
+        )
+
     def test_validate_warns_when_feishu_app_credentials_are_used_without_webhook(self) -> None:
         validation = self.service.validate(
             items=[

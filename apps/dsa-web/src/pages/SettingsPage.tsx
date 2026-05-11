@@ -25,6 +25,7 @@ type DesktopWindow = Window & {
     version?: unknown;
     getUpdateState?: () => Promise<RawDesktopUpdateState>;
     checkForUpdates?: () => Promise<RawDesktopUpdateState>;
+    installDownloadedUpdate?: () => Promise<boolean>;
     openReleasePage?: (releaseUrl?: string) => Promise<boolean>;
     onUpdateStateChange?: (listener: (state: RawDesktopUpdateState) => void) => (() => void) | void;
   };
@@ -32,6 +33,7 @@ type DesktopWindow = Window & {
 
 type DesktopUpdateState = {
   status?: string;
+  updateMode?: string;
   currentVersion?: string;
   latestVersion?: string;
   releaseUrl?: string;
@@ -40,10 +42,14 @@ type DesktopUpdateState = {
   message?: string;
   releaseName?: string;
   tagName?: string;
+  downloadPercent?: number | null;
+  downloadedBytes?: number | null;
+  totalBytes?: number | null;
 };
 
 type RawDesktopUpdateState = {
   status?: unknown;
+  updateMode?: unknown;
   currentVersion?: unknown;
   latestVersion?: unknown;
   releaseUrl?: unknown;
@@ -52,10 +58,29 @@ type RawDesktopUpdateState = {
   message?: unknown;
   releaseName?: unknown;
   tagName?: unknown;
+  downloadPercent?: unknown;
+  downloadedBytes?: unknown;
+  totalBytes?: unknown;
+};
+
+type DesktopUpdateNotice = {
+  title: string;
+  message: string;
+  variant: 'error' | 'success' | 'warning';
+  actionLabel?: string;
+  actionKind?: 'release' | 'install';
 };
 
 function trimDesktopRuntimeString(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function normalizeDesktopRuntimeNumber(value: unknown) {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  const numberValue = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(numberValue) ? numberValue : null;
 }
 
 function getDesktopRuntimeApi() {
@@ -77,6 +102,7 @@ function normalizeDesktopUpdateState(state: RawDesktopUpdateState | null | undef
 
   return {
     status: trimDesktopRuntimeString(state.status) || 'idle',
+    updateMode: trimDesktopRuntimeString(state.updateMode) || 'manual',
     currentVersion: trimDesktopRuntimeString(state.currentVersion),
     latestVersion: trimDesktopRuntimeString(state.latestVersion),
     releaseUrl: trimDesktopRuntimeString(state.releaseUrl),
@@ -85,10 +111,13 @@ function normalizeDesktopUpdateState(state: RawDesktopUpdateState | null | undef
     message: trimDesktopRuntimeString(state.message),
     releaseName: trimDesktopRuntimeString(state.releaseName),
     tagName: trimDesktopRuntimeString(state.tagName),
+    downloadPercent: normalizeDesktopRuntimeNumber(state.downloadPercent),
+    downloadedBytes: normalizeDesktopRuntimeNumber(state.downloadedBytes),
+    totalBytes: normalizeDesktopRuntimeNumber(state.totalBytes),
   };
 }
 
-function getDesktopUpdateNotice(state: DesktopUpdateState | null) {
+function getDesktopUpdateNotice(state: DesktopUpdateState | null): DesktopUpdateNotice | null {
   if (!state) {
     return null;
   }
@@ -100,7 +129,35 @@ function getDesktopUpdateNotice(state: DesktopUpdateState | null) {
       title: '发现新版本',
       message: `当前 ${currentLabel}，最新 ${latestLabel}。${state.message || '可前往 GitHub Releases 下载更新。'}`,
       variant: 'warning' as const,
-      actionLabel: '前往下载',
+      actionLabel: state.updateMode === 'auto' ? undefined : '前往下载',
+      actionKind: state.updateMode === 'auto' ? undefined : 'release',
+    };
+  }
+
+  if (state.status === 'downloading') {
+    const percentText = typeof state.downloadPercent === 'number' ? `（${state.downloadPercent}%）` : '';
+    return {
+      title: '正在下载更新',
+      message: state.message || `正在后台下载桌面端更新${percentText}。`,
+      variant: 'warning' as const,
+    };
+  }
+
+  if (state.status === 'update-downloaded') {
+    return {
+      title: '更新已下载',
+      message: state.message || '新版本已下载，可重启应用完成安装。',
+      variant: 'success' as const,
+      actionLabel: '重启安装',
+      actionKind: 'install',
+    };
+  }
+
+  if (state.status === 'installing') {
+    return {
+      title: '正在安装更新',
+      message: state.message || '正在重启并安装更新。',
+      variant: 'warning' as const,
     };
   }
 
@@ -125,6 +182,8 @@ function getDesktopUpdateNotice(state: DesktopUpdateState | null) {
       title: '检查更新失败',
       message: state.message || '无法完成更新检查，请稍后重试。',
       variant: 'error' as const,
+      actionLabel: state.updateMode === 'auto' && state.releaseUrl ? '前往下载' : undefined,
+      actionKind: state.updateMode === 'auto' && state.releaseUrl ? 'release' : undefined,
     };
   }
 
@@ -409,6 +468,32 @@ const SettingsPage: React.FC = () => {
     await desktopRuntimeApi.openReleasePage(desktopUpdateState?.releaseUrl);
   };
 
+  const installDesktopUpdate = async () => {
+    if (!desktopRuntimeApi?.installDownloadedUpdate) {
+      setDesktopUpdateState((current) => ({
+        ...(current || {}),
+        status: 'error',
+        message: '当前桌面端不支持自动安装更新，请前往发布页手动更新。',
+      }));
+      return;
+    }
+
+    try {
+      setDesktopUpdateState((current) => ({
+        ...(current || {}),
+        status: 'installing',
+        message: '正在重启并安装更新...',
+      }));
+      await desktopRuntimeApi.installDownloadedUpdate();
+    } catch (error: unknown) {
+      setDesktopUpdateState((current) => ({
+        ...(current || {}),
+        status: 'error',
+        message: error instanceof Error ? error.message : '自动安装更新失败，请前往发布页手动更新。',
+      }));
+    }
+  };
+
   const desktopUpdateNotice = getDesktopUpdateNotice(desktopUpdateState);
 
   return (
@@ -530,7 +615,7 @@ const SettingsPage: React.FC = () => {
                       <div>
                         <p className="text-sm font-medium text-foreground">桌面端更新</p>
                         <p className="text-xs leading-6 text-muted-text">
-                          启动后会自动检查 GitHub Releases 最新正式版；发现更新时仅提醒并跳转下载页，不会静默下载或自动安装。
+                          启动后会自动检查 GitHub Releases 最新正式版；Windows 安装版会后台下载更新并提示重启安装。
                         </p>
                       </div>
                       <Button
@@ -551,6 +636,10 @@ const SettingsPage: React.FC = () => {
                         variant={desktopUpdateNotice.variant}
                         actionLabel={desktopUpdateNotice.actionLabel}
                         onAction={desktopUpdateNotice.actionLabel ? () => {
+                          if (desktopUpdateNotice.actionKind === 'install') {
+                            void installDesktopUpdate();
+                            return;
+                          }
                           void openDesktopReleasePage();
                         } : undefined}
                       />

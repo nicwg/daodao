@@ -10,6 +10,7 @@ from src.services.notification_diagnostics import (
     KEY_SPECS,
     NotificationDiagnosticResult,
     P3_ROUTE_ENV_KEYS,
+    P4_NOISE_ENV_KEYS,
     format_notification_diagnostics,
     run_notification_diagnostics,
 )
@@ -41,6 +42,8 @@ class NotificationDiagnosticsTestCase(unittest.TestCase):
         self.assertIn(("CUSTOM_WEBHOOK_BODY_TEMPLATE", "advanced"), key_tiers)
         self.assertIn(("WEBHOOK_VERIFY_SSL", "advanced"), key_tiers)
         for key in P3_ROUTE_ENV_KEYS:
+            self.assertIn((key, "advanced"), key_tiers)
+        for key in P4_NOISE_ENV_KEYS:
             self.assertIn((key, "advanced"), key_tiers)
         self.assertIn(("DISCORD_BOT_TOKEN", "minimal"), key_tiers)
         self.assertIn(("SLACK_BOT_TOKEN", "minimal"), key_tiers)
@@ -121,6 +124,39 @@ class NotificationDiagnosticsTestCase(unittest.TestCase):
         self.assertEqual(len(warnings), 1)
         self.assertEqual(warnings[0].key, "NOTIFICATION_ALERT_CHANNELS")
         self.assertIn("telegram", warnings[0].message)
+
+    def test_noise_invalid_quiet_hours_reports_error(self):
+        result = run_notification_diagnostics(
+            _config(
+                wechat_webhook_url="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=1",
+                notification_quiet_hours="9:00-18:00",
+            )
+        )
+
+        self.assertFalse(result.ok)
+        self.assertIn("invalid_quiet_hours", {item.code for item in result.errors})
+
+    def test_noise_invalid_timezone_reports_error(self):
+        result = run_notification_diagnostics(
+            _config(
+                wechat_webhook_url="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=1",
+                notification_timezone="Mars/Olympus",
+            )
+        )
+
+        self.assertFalse(result.ok)
+        self.assertIn("invalid_notification_timezone", {item.code for item in result.errors})
+
+    def test_noise_daily_digest_reserved_reports_warning(self):
+        result = run_notification_diagnostics(
+            _config(
+                wechat_webhook_url="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=1",
+                notification_daily_digest_enabled=True,
+            )
+        )
+
+        self.assertTrue(result.ok)
+        self.assertIn("reserved_daily_digest", {item.code for item in result.warnings})
 
 
 if __name__ == "__main__":

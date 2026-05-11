@@ -9,6 +9,7 @@ const {
   importEnv,
   desktopCheckForUpdates,
   desktopGetUpdateState,
+  desktopInstallDownloadedUpdate,
   desktopOnUpdateStateChange,
   desktopOpenReleasePage,
   load,
@@ -28,6 +29,7 @@ const {
   importEnv: vi.fn(),
   desktopCheckForUpdates: vi.fn(),
   desktopGetUpdateState: vi.fn(),
+  desktopInstallDownloadedUpdate: vi.fn(),
   desktopOnUpdateStateChange: vi.fn(),
   desktopOpenReleasePage: vi.fn(),
   load: vi.fn(),
@@ -161,6 +163,7 @@ function createDesktopRuntime(overrides: Record<string, unknown> = {}) {
     version: '3.12.0',
     getUpdateState: desktopGetUpdateState,
     checkForUpdates: desktopCheckForUpdates,
+    installDownloadedUpdate: desktopInstallDownloadedUpdate,
     openReleasePage: desktopOpenReleasePage,
     onUpdateStateChange: desktopOnUpdateStateChange,
     ...overrides,
@@ -371,6 +374,7 @@ describe('SettingsPage', () => {
       latestVersion: '3.12.0',
       message: '当前桌面端已是最新版本。',
     });
+    desktopInstallDownloadedUpdate.mockResolvedValue(true);
     desktopOpenReleasePage.mockResolvedValue(true);
     desktopOnUpdateStateChange.mockImplementation(() => () => undefined);
     useAuthMock.mockReturnValue({
@@ -795,5 +799,26 @@ describe('SettingsPage', () => {
         'https://github.com/ZhuLinsen/daily_stock_analysis/releases/tag/v3.13.0'
       );
     });
+  });
+
+  it('renders downloaded desktop update and starts install on demand', async () => {
+    desktopGetUpdateState.mockResolvedValue({
+      status: 'update-downloaded',
+      updateMode: 'auto',
+      currentVersion: '3.12.0',
+      latestVersion: '3.13.0',
+      releaseUrl: 'https://github.com/ZhuLinsen/daily_stock_analysis/releases/tag/v3.13.0',
+      message: '新版本 3.13.0 已下载，可重启应用完成安装。',
+      downloadPercent: 100,
+    });
+    (window as { dsaDesktop?: unknown }).dsaDesktop = createDesktopRuntime();
+
+    render(<SettingsPage />);
+
+    expect(await screen.findByText('更新已下载:新版本 3.13.0 已下载，可重启应用完成安装。')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '重启安装' }));
+
+    await waitFor(() => expect(desktopInstallDownloadedUpdate).toHaveBeenCalledTimes(1));
   });
 });

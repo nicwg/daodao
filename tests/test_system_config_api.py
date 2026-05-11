@@ -114,6 +114,18 @@ class SystemConfigApiTestCase(unittest.TestCase):
         self.assertTrue(stock_schema["examples"])
         self.assertTrue(stock_schema["docs"])
 
+    def test_get_config_schema_includes_notification_noise_fields(self) -> None:
+        payload = system_config.get_system_config(include_schema=True, service=self.service).model_dump(by_alias=True)
+        item_map = {item["key"]: item for item in payload["items"]}
+
+        self.assertEqual(item_map["NOTIFICATION_DEDUP_TTL_SECONDS"]["schema"]["data_type"], "integer")
+        self.assertEqual(item_map["NOTIFICATION_COOLDOWN_SECONDS"]["schema"]["data_type"], "integer")
+        self.assertEqual(item_map["NOTIFICATION_DAILY_DIGEST_ENABLED"]["schema"]["data_type"], "boolean")
+        min_severity_schema = item_map["NOTIFICATION_MIN_SEVERITY"]["schema"]
+        self.assertEqual(min_severity_schema["options"][0]["value"], "")
+        self.assertIn("", min_severity_schema["validation"]["enum"])
+        self.assertIn("warning", min_severity_schema["validation"]["enum"])
+
     def test_get_setup_status_returns_readiness_payload(self) -> None:
         self.env_path.write_text(
             "\n".join(

@@ -242,5 +242,44 @@ class TestNotificationRouteFieldsRegistered(unittest.TestCase):
             self.assertIn(key, field_keys, f"{key} missing from schema response")
 
 
+class TestNotificationNoiseFieldsRegistered(unittest.TestCase):
+    """P4 notification noise-control keys must be visible in settings schema."""
+
+    _NOISE_KEYS = (
+        "NOTIFICATION_DEDUP_TTL_SECONDS",
+        "NOTIFICATION_COOLDOWN_SECONDS",
+        "NOTIFICATION_QUIET_HOURS",
+        "NOTIFICATION_TIMEZONE",
+        "NOTIFICATION_MIN_SEVERITY",
+        "NOTIFICATION_DAILY_DIGEST_ENABLED",
+    )
+
+    def test_field_definitions_exist(self):
+        for key in self._NOISE_KEYS:
+            field = get_field_definition(key)
+            self.assertEqual(field["category"], "notification", f"{key} category")
+            self.assertFalse(field["is_sensitive"], f"{key} should not be sensitive")
+            self.assertFalse(field["is_required"], f"{key} should not be required")
+
+        self.assertEqual(get_field_definition("NOTIFICATION_DEDUP_TTL_SECONDS")["data_type"], "integer")
+        self.assertEqual(get_field_definition("NOTIFICATION_COOLDOWN_SECONDS")["data_type"], "integer")
+        self.assertEqual(get_field_definition("NOTIFICATION_DAILY_DIGEST_ENABLED")["data_type"], "boolean")
+        min_severity = get_field_definition("NOTIFICATION_MIN_SEVERITY")
+        self.assertEqual(min_severity["options"][0]["value"], "")
+        self.assertIn("", min_severity["validation"]["enum"])
+        self.assertIn("warning", min_severity["validation"]["enum"])
+
+    def test_schema_response_includes_noise_fields(self):
+        schema = build_schema_response()
+        notification_cat = next(
+            (c for c in schema["categories"] if c["category"] == "notification"),
+            None,
+        )
+        self.assertIsNotNone(notification_cat, "notification category missing")
+        field_keys = {f["key"] for f in notification_cat["fields"]}
+        for key in self._NOISE_KEYS:
+            self.assertIn(key, field_keys, f"{key} missing from schema response")
+
+
 if __name__ == "__main__":
     unittest.main()

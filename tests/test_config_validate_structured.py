@@ -370,6 +370,29 @@ class TestValidateStructuredNotification:
         warn = [i for i in issues if i.severity == "warning"]
         assert not any("FEISHU_APP_ID / FEISHU_APP_SECRET" in i.message for i in warn)
 
+    def test_invalid_notification_noise_config_reports_errors(self):
+        cfg = _make_config(
+            notification_quiet_hours="9:00-18:00",
+            notification_timezone="Mars/Olympus",
+            notification_min_severity="notice",
+        )
+        issues = cfg.validate_structured()
+        errors = {(i.field, i.severity) for i in issues}
+
+        assert ("NOTIFICATION_QUIET_HOURS", "error") in errors
+        assert ("NOTIFICATION_TIMEZONE", "error") in errors
+        assert ("NOTIFICATION_MIN_SEVERITY", "error") in errors
+
+    def test_daily_digest_reserved_flag_warns_without_blocking(self):
+        cfg = _make_config(notification_daily_digest_enabled=True)
+        issues = cfg.validate_structured()
+
+        assert any(
+            issue.field == "NOTIFICATION_DAILY_DIGEST_ENABLED"
+            and issue.severity == "warning"
+            for issue in issues
+        )
+
     def test_no_search_engine_is_info(self):
         cfg = _make_config(searxng_public_instances_enabled=False)
         issues = cfg.validate_structured()

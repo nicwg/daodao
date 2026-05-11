@@ -5,7 +5,7 @@ from pathlib import Path
 
 import yaml
 
-from src.services.notification_diagnostics import P0_ACTIONS_ENV_KEYS, P3_ROUTE_ENV_KEYS
+from src.services.notification_diagnostics import P0_ACTIONS_ENV_KEYS, P3_ROUTE_ENV_KEYS, P4_NOISE_ENV_KEYS
 
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -40,6 +40,13 @@ def test_daily_analysis_maps_p3_notification_route_env_keys() -> None:
     env = _load_daily_analysis_env()
 
     for key in P3_ROUTE_ENV_KEYS:
+        assert key in env
+
+
+def test_daily_analysis_maps_p4_notification_noise_env_keys() -> None:
+    env = _load_daily_analysis_env()
+
+    for key in P4_NOISE_ENV_KEYS:
         assert key in env
 
 

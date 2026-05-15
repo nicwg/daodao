@@ -325,6 +325,38 @@ class BaseFetcher(ABC):
         """
         return None
 
+    def get_concept_rankings(self, n: int = 5) -> Optional[Tuple[List[Dict], List[Dict]]]:
+        """
+        获取概念/题材涨跌榜。
+
+        Returns:
+            Tuple: (领涨概念列表, 领跌概念列表)
+        """
+        return None
+
+    def get_hot_stocks(self, n: int = 10) -> Optional[List[Dict[str, Any]]]:
+        """
+        获取市场人气股榜。
+
+        Returns:
+            List[Dict]: 人气股列表
+        """
+        return None
+
+    def get_limit_up_pool(
+        self,
+        date: Optional[str] = None,
+        n: int = 20,
+    ) -> Optional[List[Dict[str, Any]]]:
+        """
+        获取涨停池/连板梯队。
+
+        Args:
+            date: YYYYMMDD，默认由具体数据源决定
+            n: 返回条数
+        """
+        return None
+
     def get_daily_data(
         self,
         stock_code: str, 
@@ -2623,3 +2655,61 @@ class DataFetcherManager:
             return top, bottom
         logger.warning(f"[板块排行] 所有数据源均失败，最终错误: {last_error}")
         return [], []
+
+    def get_concept_rankings(self, n: int = 5) -> Tuple[List[Dict], List[Dict]]:
+        """获取概念/题材涨跌榜（自动切换数据源）。"""
+        last_error = ""
+        for fetcher in self._fetchers:
+            try:
+                data = fetcher.get_concept_rankings(n)
+                if data and (data[0] or data[1]):
+                    logger.info(f"[{fetcher.name}] 获取概念排行成功")
+                    return data[0] or [], data[1] or []
+                last_error = f"{fetcher.name}返回空结果"
+            except Exception as e:
+                error_type, error_reason = summarize_exception(e)
+                last_error = f"{fetcher.name} ({error_type}) {error_reason}"
+                logger.warning(f"[{fetcher.name}] 获取概念排行失败: {error_reason}")
+        if last_error:
+            logger.warning(f"[概念排行] 所有数据源均失败，最终错误: {last_error}")
+        return [], []
+
+    def get_hot_stocks(self, n: int = 10) -> List[Dict[str, Any]]:
+        """获取市场人气股榜（自动切换数据源）。"""
+        last_error = ""
+        for fetcher in self._fetchers:
+            try:
+                data = fetcher.get_hot_stocks(n)
+                if data:
+                    logger.info(f"[{fetcher.name}] 获取人气股成功")
+                    return data[:n]
+                last_error = f"{fetcher.name}返回空结果"
+            except Exception as e:
+                error_type, error_reason = summarize_exception(e)
+                last_error = f"{fetcher.name} ({error_type}) {error_reason}"
+                logger.warning(f"[{fetcher.name}] 获取人气股失败: {error_reason}")
+        if last_error:
+            logger.warning(f"[人气股] 所有数据源均失败，最终错误: {last_error}")
+        return []
+
+    def get_limit_up_pool(
+        self,
+        date: Optional[str] = None,
+        n: int = 20,
+    ) -> List[Dict[str, Any]]:
+        """获取涨停池与连板梯队（自动切换数据源）。"""
+        last_error = ""
+        for fetcher in self._fetchers:
+            try:
+                data = fetcher.get_limit_up_pool(date=date, n=n)
+                if data:
+                    logger.info(f"[{fetcher.name}] 获取涨停池成功")
+                    return data[:n]
+                last_error = f"{fetcher.name}返回空结果"
+            except Exception as e:
+                error_type, error_reason = summarize_exception(e)
+                last_error = f"{fetcher.name} ({error_type}) {error_reason}"
+                logger.warning(f"[{fetcher.name}] 获取涨停池失败: {error_reason}")
+        if last_error:
+            logger.warning(f"[涨停池] 所有数据源均失败，最终错误: {last_error}")
+        return []

@@ -677,6 +677,7 @@ class TestMarketAnalyzerBypassFix:
             cfg.llm_model_list = []
             cfg.openai_base_url = None
             cfg.market_review_region = "cn"
+            cfg.market_review_color_scheme = "green_up"
             cfg.report_language = "zh"
             mock_cfg.return_value = cfg
             mock_cfg2.return_value = cfg
@@ -1079,6 +1080,43 @@ Sector text.
         assert "CNY 100m" not in result
         assert "Turnover (USD bn)" in result
         assert "| S&P 500 | 5200.00 |" in result
+
+    def test_indices_block_uses_configured_red_up_color_scheme(self):
+        from src.market_analyzer import MarketOverview, MarketIndex
+
+        ma = self._make_market_analyzer_with_mock_generate_text(return_value=None)
+        ma.config.market_review_color_scheme = "red_up"
+        overview = MarketOverview(
+            date="2026-03-05",
+            indices=[
+                MarketIndex(code="000001", name="上证指数", current=3200.0, change_pct=0.68),
+                MarketIndex(code="399001", name="深证成指", current=9800.0, change_pct=-0.42),
+                MarketIndex(code="399006", name="创业板指", current=2100.0, change_pct=0.0),
+            ],
+        )
+
+        result = ma._build_indices_block(overview)
+
+        assert "| 上证指数 | 3200.00 | 🔴 +0.68% |" in result
+        assert "| 深证成指 | 9800.00 | 🟢 -0.42% |" in result
+        assert "| 创业板指 | 2100.00 | ⚪ +0.00% |" in result
+
+    def test_indices_block_keeps_green_up_default_color_scheme(self):
+        from src.market_analyzer import MarketOverview, MarketIndex
+
+        ma = self._make_market_analyzer_with_mock_generate_text(return_value=None)
+        overview = MarketOverview(
+            date="2026-03-05",
+            indices=[
+                MarketIndex(code="000001", name="上证指数", current=3200.0, change_pct=0.68),
+                MarketIndex(code="399001", name="深证成指", current=9800.0, change_pct=-0.42),
+            ],
+        )
+
+        result = ma._build_indices_block(overview)
+
+        assert "| 上证指数 | 3200.00 | 🟢 +0.68% |" in result
+        assert "| 深证成指 | 9800.00 | 🔴 -0.42% |" in result
 
     def test_no_private_attribute_access_in_market_analyzer_source(self):
         """Static guard: market_analyzer.py must not access private analyzer attrs."""

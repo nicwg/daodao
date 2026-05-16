@@ -1825,6 +1825,23 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "validation": {"enum": ["cn", "hk", "us", "both"]},
         "display_order": 47,
     },
+    "MARKET_REVIEW_COLOR_SCHEME": {
+        "title": "Market Review Color Scheme",
+        "description": "Index change color style in market-review tables: green_up (green for gains, red for losses) or red_up (red for gains, green for losses).",
+        "category": "system",
+        "data_type": "string",
+        "ui_control": "select",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "green_up",
+        "options": [
+            {"label": "Green Up / Red Down", "value": "green_up"},
+            {"label": "Red Up / Green Down", "value": "red_up"},
+        ],
+        "validation": {"enum": ["green_up", "red_up"]},
+        "display_order": 48,
+    },
     "MAX_WORKERS": {
         "title": "Max Workers",
         "description": "Maximum concurrent analysis threads. Keep low to avoid API rate limits.",

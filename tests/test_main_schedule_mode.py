@@ -183,7 +183,8 @@ class MainScheduleModeTestCase(unittest.TestCase):
             agent_event_monitor_enabled=True,
             agent_event_monitor_interval_minutes=7,
         )
-        monitor = object()
+        worker = MagicMock()
+        worker.run_once.return_value = {"triggered": 2}
         scheduled_call = {}
 
         def fake_run_with_schedule(
@@ -202,17 +203,17 @@ class MainScheduleModeTestCase(unittest.TestCase):
 
         with patch("main.parse_arguments", return_value=args), \
              patch("main.get_config", return_value=config), \
-             patch("main._reload_runtime_config", return_value=config), \
+             patch("main._reload_runtime_config", return_value=config) as reload_config, \
              patch("main._build_schedule_time_provider", return_value=lambda: "18:00"), \
              patch("main.setup_logging"), \
              patch("main.run_full_analysis") as run_full_analysis, \
-             patch("src.agent.events.build_event_monitor_from_config", return_value=monitor) as build_monitor, \
-             patch("src.agent.events.run_event_monitor_once", return_value=["triggered"]) as run_monitor, \
+             patch("src.services.alert_worker.AlertWorker", return_value=worker) as worker_cls, \
              patch("src.scheduler.run_with_schedule", side_effect=fake_run_with_schedule):
             exit_code = main.main()
 
         self.assertEqual(exit_code, 0)
-        build_monitor.assert_called_once_with(config)
+        worker_cls.assert_called_once()
+        self.assertIs(worker_cls.call_args.kwargs["config_provider"], reload_config)
         run_full_analysis.assert_not_called()
         self.assertEqual(scheduled_call["schedule_time"], "18:00")
         self.assertEqual(scheduled_call["run_immediately"], True)
@@ -223,16 +224,21 @@ class MainScheduleModeTestCase(unittest.TestCase):
         self.assertEqual(background_task["interval_seconds"], 7 * 60)
         self.assertEqual(background_task["run_immediately"], True)
 
-        background_task["task"]()
+        with patch("main.logger.info") as info_log:
+            background_task["task"]()
 
-        run_monitor.assert_called_once_with(monitor)
+        worker.run_once.assert_called_once_with()
+        info_log.assert_any_call("[EventMonitor] 本轮触发 %d 条提醒", 2)
 
-    def test_schedule_mode_skips_event_monitor_background_task_without_valid_rules(self) -> None:
+    def test_schedule_mode_registers_event_monitor_worker_without_legacy_rules(self) -> None:
         args = self._make_args(schedule=True)
         config = self._make_config(
             schedule_enabled=False,
             agent_event_monitor_enabled=True,
+            agent_event_alert_rules_json="",
         )
+        worker = MagicMock()
+        worker.run_once.return_value = {"triggered": 0}
         scheduled_call = {}
 
         def fake_run_with_schedule(
@@ -250,18 +256,15 @@ class MainScheduleModeTestCase(unittest.TestCase):
              patch("main._build_schedule_time_provider", return_value=lambda: "18:00"), \
              patch("main.setup_logging"), \
              patch("main.run_full_analysis") as run_full_analysis, \
-             patch("main.logger.info") as info_log, \
-             patch("src.agent.events.build_event_monitor_from_config", return_value=None) as build_monitor, \
-             patch("src.agent.events.run_event_monitor_once") as run_monitor, \
+             patch("src.services.alert_worker.AlertWorker", return_value=worker) as worker_cls, \
              patch("src.scheduler.run_with_schedule", side_effect=fake_run_with_schedule):
             exit_code = main.main()
 
         self.assertEqual(exit_code, 0)
-        build_monitor.assert_called_once_with(config)
-        run_monitor.assert_not_called()
+        worker_cls.assert_called_once()
         run_full_analysis.assert_not_called()
-        self.assertEqual(scheduled_call["background_tasks"], [])
-        info_log.assert_any_call("EventMonitor 已启用，但未加载到有效规则，跳过后台提醒任务")
+        self.assertEqual(len(scheduled_call["background_tasks"]), 1)
+        self.assertEqual(scheduled_call["background_tasks"][0]["name"], "agent_event_monitor")
 
     def test_check_notify_returns_before_other_modes(self) -> None:
         args = self._make_args(check_notify=True, serve=True, schedule=True, market_review=True)

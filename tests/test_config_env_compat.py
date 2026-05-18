@@ -246,6 +246,25 @@ class ConfigEnvCompatibilityTestCase(unittest.TestCase):
 
     @patch("src.config.setup_env")
     @patch.object(Config, "_parse_litellm_yaml", return_value=[])
+    def test_report_show_llm_model_defaults_true_and_can_be_disabled(
+        self,
+        _mock_parse_yaml,
+        _mock_setup_env,
+    ) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            config = Config._load_from_env()
+        self.assertTrue(config.report_show_llm_model)
+
+        with patch.dict(os.environ, {"REPORT_SHOW_LLM_MODEL": "false"}, clear=True):
+            config = Config._load_from_env()
+        self.assertFalse(config.report_show_llm_model)
+
+        with patch.dict(os.environ, {"REPORT_SHOW_LLM_MODEL": ""}, clear=True):
+            config = Config._load_from_env()
+        self.assertFalse(config.report_show_llm_model)
+
+    @patch("src.config.setup_env")
+    @patch.object(Config, "_parse_litellm_yaml", return_value=[])
     def test_market_review_color_scheme_defaults_and_accepts_red_up(
         self,
         _mock_parse_yaml,

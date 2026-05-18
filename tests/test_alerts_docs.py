@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Contract checks for the alert-center P0 documentation."""
+"""Contract checks for the alert-center documentation."""
 
 from pathlib import Path
 
@@ -15,9 +15,10 @@ def _read_doc() -> str:
 def test_alerts_doc_exists_and_links_p0_scope() -> None:
     doc = _read_doc()
 
-    assert "Issue #1202 P0" in doc
+    assert "Issue #1202" in doc
     assert "AGENT_EVENT_ALERT_RULES_JSON" in doc
     assert "EventMonitor" in doc
+    assert "P1 Alert API MVP" in doc
     assert "P0 不做" in doc
 
 
@@ -78,11 +79,81 @@ def test_alerts_doc_keeps_p0_non_goals_explicit() -> None:
     doc = _read_doc()
 
     for token in (
-        "不新增 `src/schemas/alerts.py`",
+        "P0 阶段不新增 `api/v1/schemas/alerts.py`",
+        "P0 阶段不新增 Web 告警中心页面",
+        "P0 阶段不新增数据库表",
+        "P0 阶段不实现触发历史",
+        "P0 阶段不自动迁移、删除或覆盖 `AGENT_EVENT_ALERT_RULES_JSON`",
+        "P0 阶段不重写 `NotificationService`",
+    ):
+        assert token in doc
+
+
+def test_alerts_doc_defines_p1_api_mvp_scope() -> None:
+    doc = _read_doc()
+
+    for token in (
+        "api/v1/endpoints/alerts.py",
+        "api/v1/schemas/alerts.py",
+        "GET /api/v1/alerts/rules",
+        "POST /api/v1/alerts/rules",
+        "GET /api/v1/alerts/rules/{rule_id}",
+        "PATCH /api/v1/alerts/rules/{rule_id}",
+        "DELETE /api/v1/alerts/rules/{rule_id}",
+        "POST /api/v1/alerts/rules/{rule_id}/enable",
+        "POST /api/v1/alerts/rules/{rule_id}/disable",
+        "POST /api/v1/alerts/rules/{rule_id}/test",
+        "GET /api/v1/alerts/triggers",
+        "GET /api/v1/alerts/notifications",
+        "price_cross",
+        "price_change_percent",
+        "volume_spike",
+        "unsupported",
+        "脱敏",
+        "保留字段",
+        "不执行冷却或自定义通知语义",
+    ):
+        assert token in doc
+
+
+def test_alerts_doc_keeps_p1_non_goals_explicit() -> None:
+    doc = _read_doc()
+
+    for token in (
         "不新增 Web 告警中心页面",
-        "不新增数据库表",
-        "不实现触发历史",
-        "不自动迁移、删除或覆盖 `AGENT_EVENT_ALERT_RULES_JSON`",
-        "不重写 `NotificationService`",
+        "不让 schedule worker 加载持久化 active rules",
+        "不实现真实 `alert_trigger` / `alert_notification` 写入",
+        "不实现 `alert_cooldown` 执行语义",
+        "不实现 MACD、KDJ、CCI、RSI",
+        "不自动迁移、删除、覆盖或改写 legacy 配置",
+    ):
+        assert token in doc
+
+
+def test_alerts_doc_defines_p2_worker_scope() -> None:
+    doc = _read_doc()
+
+    for token in (
+        "## P2 告警评估 Worker",
+        "src/services/alert_worker.py",
+        "agent_event_monitor",
+        "持久化 active rules",
+        "legacy JSON",
+        "`triggered`、`skipped`、`degraded`、`failed`",
+        "不写 `alert_notifications`",
+        "不执行 `cooldown_policy`",
+    ):
+        assert token in doc
+
+
+def test_alerts_doc_describes_p1_rollback_for_created_tables() -> None:
+    doc = _read_doc()
+
+    for token in (
+        "P1 新增 Alert API 代码",
+        "`alert_rules` / `alert_triggers` / `alert_notifications` SQLite 表",
+        "Base.metadata.create_all()",
+        "SQLite 表与数据不会自动删除",
+        "手动删除相关表",
     ):
         assert token in doc
